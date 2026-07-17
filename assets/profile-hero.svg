@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="title description">
+  <title id="title">Alex / ASEnough — Product OS</title>
+  <desc id="description">Alex builds practical, inspectable tools for AI-assisted software work, focused on AI coding, agent workflows, and developer tools.</desc>
+  <style>
+    .surface { fill: #0D1117; stroke: #30363D; }
+    .accent-line { fill: #58A6FF; }
+    .status-surface { fill: #161B22; stroke: #30363D; }
+    .divider { stroke: #30363D; }
+    .primary { fill: #F0F6FC; }
+    .muted { fill: #8B949E; }
+    .blue { fill: #58A6FF; }
+    .green { fill: #3FB950; }
+    .identity,
+    .label,
+    .prompt,
+    .status-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    .identity { font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+    .headline { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 32px; font-weight: 700; }
+    .label { font-size: 13px; font-weight: 600; letter-spacing: 1.1px; }
+    .prompt { font-size: 15px; }
+    .status-text { font-size: 12px; font-weight: 700; letter-spacing: 0.8px; }
+    @media (prefers-color-scheme: light) {
+      .surface { fill: #FFFFFF; stroke: #D0D7DE; }
+      .status-surface { fill: #F6F8FA; stroke: #D0D7DE; }
+      .divider { stroke: #D0D7DE; }
+      .primary { fill: #1F2328; }
+      .muted { fill: #59636E; }
+      .blue { fill: #0969DA; }
+      .green { fill: #1A7F37; }
+    }
+  </style>
+  <rect class="surface" x="1" y="1" width="958" height="278" rx="18"/>
+  <rect class="accent-line" x="28" y="28" width="4" height="28" rx="2"/>
+  <text class="identity primary" x="48" y="49">ALEX / ASENOUGH</text>
+
+  <rect class="status-surface" x="782" y="27" width="150" height="32" rx="16"/>
+  <rect class="green" x="798" y="40" width="7" height="7" rx="3.5"/>
+  <text class="status-text green" x="815" y="48">BUILD: ACTIVE</text>
+
+  <text class="headline primary" x="28" y="108">Building practical, inspectable tools for</text>
+  <text class="headline primary" x="28" y="148">AI-assisted software work.</text>
+
+  <text class="label blue" x="28" y="194">AI CODING</text>
+  <text class="label muted" x="129" y="194">·</text>
+  <text class="label blue" x="150" y="194">AGENT WORKFLOWS</text>
+  <text class="label muted" x="302" y="194">·</text>
+  <text class="label blue" x="323" y="194">DEVELOPER TOOLS</text>
+
+  <line class="divider" x1="28" y1="217" x2="932" y2="217"/>
+  <text class="prompt green" x="28" y="250">alex@github:~$</text>
+  <text class="prompt muted" x="176" y="250">turning demos into repeatable systems_</text>
+</svg>

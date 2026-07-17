@@ -1,59 +1,45 @@
-<img src="./assets/builder-console.svg" alt="Alex's Builder Console: AI coding, agent workflows, and developer tools" width="100%">
+<img src="./assets/profile-hero.svg" alt="Alex / ASEnough builds practical, inspectable tools for AI-assisted software work" width="100%">
 
 # Hi, I'm Alex / ASEnough.
 
-**I build agent-ready developer tools for AI-assisted software work.**
+我在做更实用、可检查、可复现的 AI Coding 与 Agent 工作流工具。
 
-我在做面向 AI Coding、Agent 工作流和开发者自动化的实用工具。
+## What I'm Building
 
-[Selected Work](#selected-work) · [Now](#now) · [Building Principles](#building-principles) · [Connect](#connect)
+### [01 / Planarian](https://github.com/alexliluz/planarian)
 
-## Selected Work
+`Experimental` · `Agent Workflow` · `TypeScript`
 
-### [Planarian](https://github.com/alexliluz/planarian)
+**Reproducible UI reconstruction workflows for coding agents.**
 
-`Experimental` · `Agent Workflow` · `TypeScript` · `UI Engineering`
+Planarian turns visual reconstruction into an inspectable process with stable artifacts, task bundles, validation commands, and explicit agent handoffs.
 
-> Repeatable UI reconstruction workflows designed for coding agents.
-
-Planarian turns UI reconstruction into an inspectable, file-based process with stable session artifacts, task bundles, validation commands, and agent handoffs.
-
-### [ForkNeo](https://github.com/alexliluz/ForkNeo)
+### [02 / ForkNeo](https://github.com/alexliluz/ForkNeo)
 
 `Active` · `CLI` · `GitHub Automation` · `TypeScript`
 
-> Convert GitHub forks into independent repositories while preserving Git history.
+**Safe fork-to-independent repository migration without losing history.**
 
-ForkNeo safely mirrors branches, tags, default-branch state, and Git LFS objects, then verifies the resulting independent repository.
+ForkNeo preserves branches, tags, default-branch state, and Git LFS objects, then verifies the independent repository.
 
-### [api-image-neo](https://github.com/alexliluz/api-image-neo)
+### [03 / api-image-neo](https://github.com/alexliluz/api-image-neo)
 
 `Active` · `Codex Skill` · `Image Generation` · `Python`
 
-> Image generation for Codex through OpenAI-compatible providers.
+**Provider-flexible image generation workflows for Codex.**
 
-The skill supports generation, reference-image workflows, and editing while keeping provider credentials in the user's existing Codex configuration.
+The skill supports generation, reference-image workflows, and editing through OpenAI-compatible providers while reusing existing Codex configuration.
 
 ## Now
 
-Currently exploring reproducible agent workflows, reusable Codex skills, and practical tools that make AI-assisted development easier to inspect and maintain.
+Turning agent demos into repeatable engineering workflows.
 
-最近在探索可复现的 Agent 工作流、可复用 Codex Skills，以及更透明、更容易维护的 AI Coding 工具。
+把 Agent Demo 变成可复现、可验证、可长期维护的工程工作流。
 
 ## Building Principles
 
-- Build tools that remove repeated friction.
-- AI workflows should leave inspectable artifacts.
-- Useful first, impressive second.
-
-## Working With
-
-`TypeScript` · `Python` · `Vue` · `Node.js` · `GitHub Actions`
-
-## Connect
-
-[GitHub](https://github.com/alexliluz)
+`Inspectable artifacts` · `Reproducible workflows` · `Useful before impressive`
 
 ---
 
-<sub>Building small tools for better human–agent collaboration.</sub>
+[Explore all repositories →](https://github.com/alexliluz?tab=repositories)
