@@ -1,7 +1,10 @@
 import re
 import unittest
 import xml.etree.ElementTree as ET
+from contextlib import nullcontext
 from pathlib import Path
+from unittest.mock import patch
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
@@ -150,8 +153,45 @@ class ProfileContractTests(unittest.TestCase):
                     url,
                     headers={"User-Agent": "alexliluz-profile-verifier"},
                 )
-                with urlopen(request, timeout=15) as response:
-                    self.assertLess(response.status, 400)
+                for attempt in range(3):
+                    try:
+                        with urlopen(request, timeout=15) as response:
+                            self.assertLess(response.status, 400)
+                        break
+                    except URLError:
+                        if attempt == 2:
+                            raise
+
+    def test_public_url_check_retries_one_transient_failure(self) -> None:
+        class SuccessfulResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+        outcomes = [URLError("transient TLS EOF")]
+        outcomes.extend(SuccessfulResponse() for _ in PROFILE_URLS)
+
+        def flaky_urlopen(*args, **kwargs):
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        with patch.object(
+            self,
+            "subTest",
+            side_effect=lambda **kwargs: nullcontext(),
+        ), patch(f"{__name__}.urlopen", side_effect=flaky_urlopen) as mocked:
+            try:
+                self.test_selected_project_urls_are_public()
+            except URLError as error:
+                self.fail(f"public URL verification did not retry: {error}")
+
+        self.assertEqual(mocked.call_count, len(PROFILE_URLS) + 1)
 
 
 if __name__ == "__main__":
