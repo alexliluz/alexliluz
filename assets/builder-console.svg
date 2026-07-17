@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 220" role="img" aria-labelledby="title description">
+  <title id="title">Alex's Builder Console</title>
+  <desc id="description">A terminal-style introduction describing Alex's focus on AI coding, agent workflows, and developer tools.</desc>
+  <style>
+    .panel { fill: #0d1117; stroke: #30363d; }
+    .bar { fill: #161b22; }
+    .prompt { fill: #3fb950; }
+    .command { fill: #58a6ff; }
+    .text { fill: #c9d1d9; }
+    .muted { fill: #8b949e; }
+    text { font: 18px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    @media (prefers-color-scheme: light) {
+      .panel { fill: #ffffff; stroke: #d0d7de; }
+      .bar { fill: #f6f8fa; }
+      .prompt { fill: #1a7f37; }
+      .command { fill: #0969da; }
+      .text { fill: #24292f; }
+      .muted { fill: #57606a; }
+    }
+  </style>
+  <rect class="panel" x="1" y="1" width="958" height="218" rx="14"/>
+  <path class="bar" d="M15 1h930a14 14 0 0 1 14 14v27H1V15A14 14 0 0 1 15 1Z"/>
+  <circle cx="23" cy="22" r="6" fill="#ff5f57"/>
+  <circle cx="43" cy="22" r="6" fill="#febc2e"/>
+  <circle cx="63" cy="22" r="6" fill="#28c840"/>
+  <text x="28" y="78"><tspan class="prompt">alex@github:~$</tspan><tspan class="command"> ./about</tspan></text>
+  <text class="text" x="28" y="116">builder.mode = "agent-ready"</text>
+  <text class="text" x="28" y="152">focus = ["AI coding", "agent workflows", "developer tools"]</text>
+  <text class="muted" x="28" y="188">status = "building practical things"</text>
+</svg>
