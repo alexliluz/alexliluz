@@ -774,10 +774,10 @@ git commit -m "feat: compose cyber flagship profile"
 Run:
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest -v tests/verify_profile.py tests/test_validate_profile_assets.py
 ```
 
-Expected: every test passes.
+Expected: every profile-contract and generated-SVG-validator test passes. Do not use bare `unittest discover`: the established `verify_profile.py` filename does not match its default `test*.py` discovery pattern.
 
 - [ ] **Step 2: Run static integrity and policy checks**
 
@@ -904,7 +904,7 @@ Run:
 ```bash
 git fetch origin
 test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-python3 -m unittest discover -s tests -v
+python3 -m unittest -v tests/verify_profile.py tests/test_validate_profile_assets.py
 .tmp/gh-cli/gh_2.96.0_macOS_arm64/bin/gh api repos/alexliluz/alexliluz/branches/output --jq '.name'
 ```
 
