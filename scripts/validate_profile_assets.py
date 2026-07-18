@@ -10,6 +10,22 @@ SVG_TAG = "{http://www.w3.org/2000/svg}svg"
 CREDENTIAL_PATTERN = re.compile(
     r"(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})"
 )
+MAX_SVG_BYTES = 2 * 1024 * 1024
+EXTERNAL_REFERENCE_PATTERN = re.compile(
+    r'(?:href|src)\s*=\s*["\']\s*https?://',
+    re.IGNORECASE,
+)
+
+
+def has_external_http_reference(source: str, root: ET.Element) -> bool:
+    if EXTERNAL_REFERENCE_PATTERN.search(source):
+        return True
+    for element in root.iter():
+        for attribute, value in element.attrib.items():
+            if attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "src"}:
+                if value.strip().lower().startswith(("http://", "https://")):
+                    return True
+    return False
 
 
 def validate_svg(path: Path) -> None:
@@ -17,6 +33,8 @@ def validate_svg(path: Path) -> None:
         raise ValueError("file does not exist")
     if path.stat().st_size == 0:
         raise ValueError("file is empty")
+    if path.stat().st_size > MAX_SVG_BYTES:
+        raise ValueError("file exceeds 2 MiB")
 
     try:
         source = path.read_text(encoding="utf-8")
@@ -25,6 +43,10 @@ def validate_svg(path: Path) -> None:
 
     if CREDENTIAL_PATTERN.search(source):
         raise ValueError("file contains credential-like text")
+    if "<script" in source.lower():
+        raise ValueError("file contains script content")
+    if EXTERNAL_REFERENCE_PATTERN.search(source):
+        raise ValueError("file contains an external HTTP reference")
 
     try:
         root = ET.fromstring(source)
@@ -33,6 +55,8 @@ def validate_svg(path: Path) -> None:
 
     if root.tag != SVG_TAG:
         raise ValueError(f"root element is {root.tag!r}, not SVG")
+    if has_external_http_reference(source, root):
+        raise ValueError("file contains an external HTTP reference")
 
 
 def main() -> int:

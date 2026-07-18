@@ -51,6 +51,39 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "credential-like"):
                 validate_svg(path)
 
+    def test_rejects_scripts_external_images_and_oversized_svg(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            fixtures = (
+                self.write_fixture(
+                    directory,
+                    "script.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "external.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<image href="https://example.com/image.svg"/></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "encoded-external.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<image href="https&#x3a;//example.com/image.svg"/></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "large.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg"><desc>'
+                    + ("x" * (2 * 1024 * 1024))
+                    + "</desc></svg>",
+                ),
+            )
+            for path in fixtures:
+                with self.subTest(path=path), self.assertRaises(ValueError):
+                    validate_svg(path)
+
     def test_cli_reports_the_invalid_path_and_returns_nonzero(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = self.write_fixture(Path(temporary_directory), "error.svg", "bad")
