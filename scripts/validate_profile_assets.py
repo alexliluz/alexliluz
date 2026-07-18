@@ -15,6 +15,10 @@ CSS_REMOTE_URL_PATTERN = re.compile(
     r"url\(\s*(?:['\"]\s*)?(?:(?:https?:)?//)",
     re.IGNORECASE,
 )
+CSS_REMOTE_IMPORT_PATTERN = re.compile(
+    r"@import\s+(?:['\"]\s*)?(?:(?:https?:)?//)",
+    re.IGNORECASE,
+)
 MAX_SVG_BYTES = 2 * 1024 * 1024
 
 
@@ -26,9 +30,28 @@ def is_remote_url(value: str) -> bool:
     return value.strip().lower().startswith(("http://", "https://", "//"))
 
 
+def is_executable_url(value: str) -> bool:
+    normalized = "".join(value.split()).lower()
+    return normalized.startswith(("javascript:", "vbscript:"))
+
+
+def has_remote_css_reference(css: str) -> bool:
+    return bool(
+        CSS_REMOTE_URL_PATTERN.search(css) or CSS_REMOTE_IMPORT_PATTERN.search(css)
+    )
+
+
+def has_executable_svg_content(root: ET.Element) -> bool:
+    for element in root.iter():
+        for attribute, value in element.attrib.items():
+            if local_name(attribute).startswith("on") or is_executable_url(value):
+                return True
+    return False
+
+
 def has_remote_runtime_reference(root: ET.Element) -> bool:
     for element in root.iter():
-        if local_name(element.tag) == "style" and CSS_REMOTE_URL_PATTERN.search(
+        if local_name(element.tag) == "style" and has_remote_css_reference(
             element.text or ""
         ):
             return True
@@ -38,7 +61,7 @@ def has_remote_runtime_reference(root: ET.Element) -> bool:
                 return True
             if attribute_name in {"href", "src"} and is_remote_url(value):
                 return True
-            if CSS_REMOTE_URL_PATTERN.search(value):
+            if has_remote_css_reference(value):
                 return True
     return False
 
@@ -56,6 +79,8 @@ def validate_svg_source(source: str) -> ET.Element:
         raise ValueError(f"root element is {root.tag!r}, not SVG")
     if any(local_name(element.tag) == "script" for element in root.iter()):
         raise ValueError("file contains script content")
+    if has_executable_svg_content(root):
+        raise ValueError("file contains executable SVG content")
     if has_remote_runtime_reference(root):
         raise ValueError("file contains an external runtime reference")
     return root

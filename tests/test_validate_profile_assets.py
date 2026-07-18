@@ -70,6 +70,29 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
                 ),
                 self.write_fixture(
                     directory,
+                    "event-handler.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg"><rect onload="x()"/></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "namespaced-event-handler.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg" '
+                    'xmlns:s="http://www.w3.org/2000/svg"><rect s:onclick="x()"/></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "javascript-link.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<a href=" \nJaVaScRiPt&#x3a;alert(1)"><text>x</text></a></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "vbscript-link.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<a href="vbscript:msgbox(1)"><text>x</text></a></svg>',
+                ),
+                self.write_fixture(
+                    directory,
                     "external.svg",
                     '<svg xmlns="http://www.w3.org/2000/svg">'
                     '<image href="https://example.com/image.svg"/></svg>',
@@ -97,6 +120,18 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
                     "css-remote.svg",
                     '<svg xmlns="http://www.w3.org/2000/svg">'
                     '<style>.x{fill:url(//example.com/image.svg)}</style></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "css-import-https.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<style>@import "https://example.com/theme.css";</style></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "css-import-protocol-relative.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<style>@import \'//example.com/theme.css\';</style></svg>',
                 ),
                 self.write_fixture(
                     directory,
