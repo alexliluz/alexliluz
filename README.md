@@ -1,6 +1,6 @@
 <img src="./assets/alex-signature.svg" alt="Alex — building tools that stay inspectable" width="100%">
 
-TypeScript / Python developer focused on developer tooling, CLI automation, and reproducible systems.
+TypeScript / Python developer focused on developer tooling, CLI automation, and reproducible systems.<br>
 主要使用 TypeScript、Python 与 Node.js，专注开发者工具、CLI 自动化和可复现工程工作流。
 
 ## Tech stack

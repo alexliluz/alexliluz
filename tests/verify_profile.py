@@ -19,11 +19,17 @@ STAR_HISTORY = ROOT / "scripts" / "profile_star_history.py"
 GENERATED_ASSET_BASE = (
     "https://raw.githubusercontent.com/alexliluz/alexliluz/output/"
 )
-SIGNAL_ASSETS = (
-    "contribution-signal-light.svg",
-    "contribution-signal-dark.svg",
-    "contribution-signal-light-static.svg",
-    "contribution-signal-dark-static.svg",
+SIGNAL_SOURCES = (
+    (
+        "(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)",
+        "contribution-signal-dark-static.svg",
+    ),
+    (
+        "(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)",
+        "contribution-signal-light-static.svg",
+    ),
+    ("(prefers-color-scheme: dark)", "contribution-signal-dark.svg"),
+    ("(prefers-color-scheme: light)", "contribution-signal-light.svg"),
 )
 PROFILE_URLS = (
     "https://github.com/alexliluz/planarian",
@@ -52,22 +58,23 @@ class ProfileContractTests(unittest.TestCase):
 
     def test_v4_sections_and_positioning_are_present_in_order(self) -> None:
         text = self.read_readme()
+        positioning = (
+            "TypeScript / Python developer focused on developer tooling, "
+            "CLI automation, and reproducible systems.<br>\n"
+            "主要使用 TypeScript、Python 与 Node.js，专注开发者工具、"
+            "CLI 自动化和可复现工程工作流。"
+        )
         required = (
             "./assets/alex-signature.svg",
-            "TypeScript / Python developer focused on developer tooling, "
-            "CLI automation, and reproducible systems.",
+            positioning,
             "## Tech stack",
             "## Featured work",
             "## Contribution Signal",
             "[Explore all repositories →]",
         )
+        self.assertIn(positioning, text)
         positions = [text.index(fragment) for fragment in required]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn(
-            "主要使用 TypeScript、Python 与 Node.js，专注开发者工具、"
-            "CLI 自动化和可复现工程工作流。",
-            text,
-        )
         for removed in (
             "# Hi, I'm Alex / ASEnough 👋",
             "AI Coding",
@@ -80,14 +87,28 @@ class ProfileContractTests(unittest.TestCase):
 
     def test_four_technology_badges_and_three_star_badges_are_present(self) -> None:
         text = self.read_readme()
-        for label in (
-            "TypeScript-3178C6",
-            "Python-3776AB",
-            "Node.js-339933",
-            "GitHub_Actions-2088FF",
-        ):
-            self.assertIn(f"https://img.shields.io/badge/{label}", text)
-        self.assertEqual(text.count("https://img.shields.io/github/stars/"), 3)
+        technology_badges = re.findall(
+            r"https://img\.shields\.io/badge/[^\"\s>]+",
+            text,
+        )
+        self.assertEqual(
+            technology_badges,
+            [
+                "https://img.shields.io/badge/TypeScript-3178C6"
+                "?style=flat-square&logo=typescript&logoColor=white",
+                "https://img.shields.io/badge/Python-3776AB"
+                "?style=flat-square&logo=python&logoColor=white",
+                "https://img.shields.io/badge/Node.js-339933"
+                "?style=flat-square&logo=nodedotjs&logoColor=white",
+                "https://img.shields.io/badge/GitHub_Actions-2088FF"
+                "?style=flat-square&logo=githubactions&logoColor=white",
+            ],
+        )
+        star_badges = re.findall(
+            r"https://img\.shields\.io/github/stars/[^\"\s>]+",
+            text,
+        )
+        self.assertEqual(len(star_badges), 3)
         for repository in ("planarian", "ForkNeo", "api-image-neo"):
             self.assertIn(
                 f"https://img.shields.io/github/stars/alexliluz/{repository}",
@@ -136,21 +157,36 @@ class ProfileContractTests(unittest.TestCase):
         text = self.read_readme()
         self.assertEqual(text.count("<picture>"), 1)
         self.assertEqual(text.count("</picture>"), 1)
-        for asset in SIGNAL_ASSETS:
-            self.assertIn(f"{GENERATED_ASSET_BASE}{asset}", text)
-        self.assertIn(
-            'media="(prefers-reduced-motion: reduce) and '
-            '(prefers-color-scheme: dark)"',
-            text,
+        picture_match = re.search(r"<picture>\n(.*?)\n</picture>", text, re.DOTALL)
+        self.assertIsNotNone(picture_match)
+        picture = picture_match.group(1)
+        sources = re.findall(
+            r'^[ \t]*<source media="([^"]+)" srcset="([^"]+)">$',
+            picture,
+            re.MULTILINE,
         )
-        self.assertIn(
-            'media="(prefers-reduced-motion: reduce) and '
-            '(prefers-color-scheme: light)"',
-            text,
+        self.assertEqual(
+            sources,
+            [
+                (media, f"{GENERATED_ASSET_BASE}{asset}")
+                for media, asset in SIGNAL_SOURCES
+            ],
         )
-        self.assertIn('media="(prefers-color-scheme: dark)"', text)
-        self.assertIn('media="(prefers-color-scheme: light)"', text)
-        self.assertIn('alt="Alex contribution signal:', text)
+        fallback = re.findall(
+            r'^[ \t]*<img src="([^"]+)" alt="([^"]+)" width="100%">$',
+            picture,
+            re.MULTILINE,
+        )
+        self.assertEqual(
+            fallback,
+            [
+                (
+                    f"{GENERATED_ASSET_BASE}contribution-signal-light.svg",
+                    "Alex contribution signal: Star trend, 3D contribution city, "
+                    "and original animated contribution-grid snake",
+                )
+            ],
+        )
 
     def test_readme_avoids_unapproved_widgets_and_placeholders(self) -> None:
         text = self.read_readme()
@@ -216,41 +252,216 @@ class ProfileContractTests(unittest.TestCase):
 
     def test_generated_asset_workflow_is_hardened(self) -> None:
         source = WORKFLOW.read_text(encoding="utf-8")
+        step_prefix = "      - name: "
+
+        def step_block(name: str) -> str:
+            start = source.index(f"{step_prefix}{name}\n")
+            end = source.find(f"\n{step_prefix}", start + len(step_prefix))
+            return source[start:] if end == -1 else source[start:end]
+
+        def line_position(block: str, line: str) -> int:
+            match = re.search(
+                rf"(?m)^[ \t]*{re.escape(line)}[ \t]*$",
+                block,
+            )
+            self.assertIsNotNone(match, line)
+            return match.start()
+
         for fragment in (
             "schedule:",
             "workflow_dispatch:",
-            "contents: write",
-            "concurrency:",
             "timeout-minutes: 15",
             "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
             "Platane/snk/svg-only@d8f6715049803e982ee5ff501b6b9b7d5deeb09b",
             "yoshi389111/github-profile-3d-contrib@7d95e7d4cdc028dd1e1cbd957d65f35efb12ae39",
-            "profile-3d-light.svg",
-            "profile-3d-dark.svg",
-            "contribution-snake-light.svg",
-            "contribution-snake-dark.svg",
-            "scripts/validate_profile_assets.py",
-            "git -C .tmp/output-branch push origin HEAD:output",
         ):
             self.assertIn(fragment, source)
-        for fragment in (
-            "scripts/profile_star_history.py",
-            "scripts/compose_contribution_signal.py",
-            "star-history.json",
-            "contribution-signal-light.svg",
-            "contribution-signal-dark.svg",
-            "contribution-signal-light-static.svg",
-            "contribution-signal-dark-static.svg",
-            "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
-        ):
-            self.assertIn(fragment, source)
-        self.assertNotIn("secrets.PAT", source)
-        self.assertNotIn("PROFILE_STATS_TOKEN", source)
+
+        permissions = source[
+            source.index("permissions:") : source.index("\nconcurrency:")
+        ]
+        self.assertEqual(permissions, "permissions:\n  contents: write\n")
+        self.assertEqual(
+            re.findall(
+                r"(?m)^[ \t]*permissions:[ \t]*$",
+                source,
+            ),
+            ["permissions:"],
+        )
+        self.assertEqual(
+            re.findall(
+                r"(?m)^[ \t]*cancel-in-progress:[ \t]*(\S+)[ \t]*$",
+                source,
+            ),
+            ["true"],
+        )
+
+        secret_expressions = re.findall(
+            r"\$\{\{\s*secrets[^}]*\}\}",
+            source,
+        )
+        self.assertTrue(secret_expressions)
+        self.assertEqual(
+            set(secret_expressions),
+            {"${{ secrets.GITHUB_TOKEN }}"},
+        )
+        self.assertNotRegex(source, r"(?i)\b(?:PAT|PROFILE_STATS_TOKEN)\b")
         self.assertNotIn("|| exit 0", source)
+
         action_refs = re.findall(r"uses:\s+[^\s]+@([^\s#]+)", source)
         self.assertEqual(len(action_refs), 3)
         for ref in action_refs:
             self.assertRegex(ref, r"^[0-9a-f]{40}$")
+
+        ordered_steps = (
+            "Generate contribution snakes",
+            "Generate 3D contribution city",
+            "Assemble stable output names",
+            "Restore previous Star snapshots",
+            "Record current Star counts",
+            "Compose Contribution Signal assets",
+            "Validate generated SVGs",
+            "Publish output branch atomically",
+        )
+        step_positions = [
+            source.index(f"{step_prefix}{name}\n") for name in ordered_steps
+        ]
+        self.assertEqual(step_positions, sorted(step_positions))
+
+        source_assets = (
+            "profile-3d-light.svg",
+            "profile-3d-dark.svg",
+            "contribution-snake-light.svg",
+            "contribution-snake-dark.svg",
+        )
+        assembled_assets = re.findall(
+            r"(?m)^[ \t]*cp \S+ \.tmp/profile-output/([^\s]+\.svg)$",
+            step_block("Assemble stable output names"),
+        )
+        self.assertEqual(assembled_assets, list(source_assets))
+
+        star_history = step_block("Record current Star counts")
+        star_history_commands = (
+            "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+            "python3 scripts/profile_star_history.py \\",
+            "--history .tmp/previous-star-history.json \\",
+            "--output .tmp/profile-output/star-history.json \\",
+            '--owner "${{ github.repository_owner }}"',
+        )
+        star_history_positions = [
+            line_position(star_history, command)
+            for command in star_history_commands
+        ]
+        self.assertEqual(
+            star_history_positions,
+            sorted(star_history_positions),
+        )
+
+        composite_assets = (
+            "contribution-signal-light.svg",
+            "contribution-signal-dark.svg",
+            "contribution-signal-light-static.svg",
+            "contribution-signal-dark-static.svg",
+        )
+        compose = step_block("Compose Contribution Signal assets")
+        compose_commands = (
+            "python3 scripts/compose_contribution_signal.py \\",
+            "--city-light .tmp/profile-output/profile-3d-light.svg \\",
+            "--city-dark .tmp/profile-output/profile-3d-dark.svg \\",
+            "--snake-light .tmp/profile-output/contribution-snake-light.svg \\",
+            "--snake-dark .tmp/profile-output/contribution-snake-dark.svg \\",
+            "--history .tmp/profile-output/star-history.json \\",
+            "--output-dir .tmp/profile-output",
+        )
+        compose_positions = [
+            line_position(compose, command) for command in compose_commands
+        ]
+        self.assertEqual(
+            compose_positions,
+            sorted(compose_positions),
+        )
+        self.assertEqual(
+            re.findall(
+                r"(?m)^[ \t]*test -f \.tmp/profile-output/([^\s]+\.svg)$",
+                compose,
+            ),
+            list(composite_assets),
+        )
+
+        restore = step_block("Restore previous Star snapshots")
+        restore_commands = (
+            "if git ls-remote --exit-code --heads origin output "
+            ">/dev/null 2>&1; then",
+            "git fetch origin output",
+            "if git cat-file -e origin/output:star-history.json "
+            "2>/dev/null; then",
+            "git show origin/output:star-history.json > "
+            ".tmp/previous-star-history.json",
+        )
+        restore_positions = [
+            line_position(restore, command) for command in restore_commands
+        ]
+        self.assertEqual(restore_positions, sorted(restore_positions))
+        self.assertEqual(restore.count("git fetch origin output"), 1)
+        self.assertEqual(
+            restore.count("origin/output:star-history.json"),
+            2,
+        )
+
+        publication = step_block("Publish output branch atomically")
+        self.assertEqual(
+            source.count(f"{step_prefix}Publish output branch atomically\n"),
+            1,
+        )
+        publication_guard = (
+            "if git ls-remote --exit-code --heads origin output "
+            ">/dev/null 2>&1; then"
+        )
+        self.assertLess(
+            line_position(publication, publication_guard),
+            line_position(publication, "git fetch origin output"),
+        )
+        self.assertEqual(
+            re.findall(
+                r"(?m)^[ \t]*cp \.tmp/profile-output/"
+                r"(\*\.svg|star-history\.json) \.tmp/output-branch/$",
+                publication,
+            ),
+            ["*.svg", "star-history.json"],
+        )
+        push_commands = re.findall(
+            r"(?m)^[ \t]*(git(?: -C \S+)? push [^\n]+)$",
+            source,
+        )
+        self.assertEqual(
+            push_commands,
+            ["git -C .tmp/output-branch push origin HEAD:output"],
+        )
+
+        validate = step_block("Validate generated SVGs")
+        validate_command = (
+            "python3 scripts/validate_profile_assets.py .tmp/profile-output/*.svg"
+        )
+        line_position(validate, f"run: {validate_command}")
+        validate_position = source.index(validate_command)
+        publish_position = step_positions[-1]
+        svg_copy_position = source.index(
+            "cp .tmp/profile-output/*.svg .tmp/output-branch/",
+            publish_position,
+        )
+        json_copy_position = source.index(
+            "cp .tmp/profile-output/star-history.json .tmp/output-branch/",
+            publish_position,
+        )
+        push_position = source.index(push_commands[0], publish_position)
+        self.assertLess(
+            validate_position,
+            publish_position,
+        )
+        self.assertEqual(
+            [svg_copy_position, json_copy_position, push_position],
+            sorted((svg_copy_position, json_copy_position, push_position)),
+        )
 
     def test_selected_project_urls_are_public(self) -> None:
         for url in PROFILE_URLS:
