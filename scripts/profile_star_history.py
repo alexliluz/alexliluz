@@ -13,7 +13,7 @@ MAX_SNAPSHOTS = 730
 
 
 def validate_counts(counts: dict) -> dict[str, int]:
-    if set(counts) != set(REPOSITORIES):
+    if not isinstance(counts, dict) or set(counts) != set(REPOSITORIES):
         raise ValueError("repo keys must exactly match configured repositories")
     normalized = {}
     for repository in REPOSITORIES:
@@ -33,7 +33,10 @@ def validate_history(history: dict) -> dict:
     for snapshot in snapshots:
         if not isinstance(snapshot, dict):
             raise ValueError("snapshot must be an object")
-        date.fromisoformat(snapshot.get("date", ""))
+        snapshot_date = snapshot.get("date")
+        if not isinstance(snapshot_date, str):
+            raise ValueError("snapshot date must be an ISO string")
+        date.fromisoformat(snapshot_date)
         validate_counts(snapshot.get("repos", {}))
     return history
 
