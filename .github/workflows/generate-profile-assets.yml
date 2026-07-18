@@ -1,0 +1,73 @@
+name: Generate profile assets
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: profile-assets
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out profile repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Generate contribution snakes
+        uses: Platane/snk/svg-only@d8f6715049803e982ee5ff501b6b9b7d5deeb09b # v3.5.0
+        with:
+          github_user_name: ${{ github.repository_owner }}
+          outputs: |
+            dist/contribution-snake-light.svg?palette=github-light&color_snake=#8250DF
+            dist/contribution-snake-dark.svg?palette=github-dark&color_snake=#A371F7
+
+      - name: Generate 3D contribution city
+        uses: yoshi389111/github-profile-3d-contrib@7d95e7d4cdc028dd1e1cbd957d65f35efb12ae39 # v0.9.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          USERNAME: ${{ github.repository_owner }}
+
+      - name: Assemble stable output names
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/profile-output
+          cp profile-3d-contrib/profile-green-animate.svg .tmp/profile-output/profile-3d-light.svg
+          cp profile-3d-contrib/profile-night-rainbow.svg .tmp/profile-output/profile-3d-dark.svg
+          cp dist/contribution-snake-light.svg .tmp/profile-output/contribution-snake-light.svg
+          cp dist/contribution-snake-dark.svg .tmp/profile-output/contribution-snake-dark.svg
+
+      - name: Validate generated SVGs
+        run: python3 scripts/validate_profile_assets.py .tmp/profile-output/*.svg
+
+      - name: Publish output branch atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .tmp/output-branch
+          if git ls-remote --exit-code --heads origin output >/dev/null 2>&1; then
+            git fetch origin output
+            git worktree add --detach .tmp/output-branch origin/output
+            git -C .tmp/output-branch rm -rf .
+          else
+            git worktree add --detach .tmp/output-branch
+            git -C .tmp/output-branch checkout --orphan output
+            git -C .tmp/output-branch rm -rf .
+          fi
+          cp .tmp/profile-output/*.svg .tmp/output-branch/
+          touch .tmp/output-branch/.nojekyll
+          git -C .tmp/output-branch add .
+          if git -C .tmp/output-branch diff --cached --quiet; then
+            exit 0
+          fi
+          git -C .tmp/output-branch config user.name github-actions[bot]
+          git -C .tmp/output-branch config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C .tmp/output-branch commit -m "chore: refresh profile assets"
+          git -C .tmp/output-branch push origin HEAD:output
