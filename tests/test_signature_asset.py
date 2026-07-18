@@ -1,7 +1,9 @@
-import re
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest.mock import call, patch
+
+from scripts import build_signature
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +37,7 @@ class SignatureAssetTests(unittest.TestCase):
         ):
             self.assertIn(fragment, source)
         self.assertGreaterEqual(source.count("<path"), 4)
+        self.assertLess(SIGNATURE.stat().st_size, 2 * 1024 * 1024)
         self.assertNotRegex(source, r'(?:href|src)=["\']https?://')
         self.assertNotIn("<script", source.lower())
 
@@ -42,6 +45,28 @@ class SignatureAssetTests(unittest.TestCase):
         source = SIGNATURE.read_text(encoding="utf-8")
         self.assertIn('id="signature-outline"', source)
         self.assertNotRegex(source, r"<text[^>]*>\s*Alex\s*</text>")
+
+    def test_generator_reproduces_identical_output_for_identical_font_input(
+        self,
+    ) -> None:
+        font = Path("fixture-kalam-bold.ttf")
+        outlined_paths = '<path d="M0 0H1V1Z"/>'
+        with patch.object(
+            build_signature,
+            "outlined_word",
+            return_value=(outlined_paths, 100.0),
+        ) as outlined_word:
+            first = build_signature.build_svg(font)
+            second = build_signature.build_svg(font)
+
+        self.assertEqual(first, second)
+        self.assertEqual(
+            outlined_word.call_args_list,
+            [
+                call(font, build_signature.WORD),
+                call(font, build_signature.WORD),
+            ],
+        )
 
 
 if __name__ == "__main__":

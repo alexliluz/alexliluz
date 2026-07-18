@@ -3,15 +3,14 @@ import argparse
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from fontTools.pens.svgPathPen import SVGPathPen
-from fontTools.ttLib import TTFont
-
-
 WORD = "Alex"
 SUBTITLE = "BUILDING TOOLS THAT STAY INSPECTABLE"
 
 
 def outlined_word(font_path: Path, word: str) -> tuple[str, float]:
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.ttLib import TTFont
+
     font = TTFont(font_path)
     glyph_set = font.getGlyphSet()
     cmap = font.getBestCmap()
