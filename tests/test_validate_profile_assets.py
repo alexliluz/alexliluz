@@ -251,6 +251,53 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
             with self.subTest(fixture=fixture), self.assertRaises(ValueError):
                 validate_svg_source(source)
 
+    def test_rejects_srcdoc_attributes_by_local_name(self) -> None:
+        fixtures = (
+            '<foreignObject><iframe xmlns="http://www.w3.org/1999/xhtml" '
+            'srcdoc="&lt;script&gt;alert(1)&lt;/script&gt;"/></foreignObject>',
+            '<foreignObject xmlns:xhtml="http://www.w3.org/1999/xhtml" '
+            'xhtml:srcdoc="&lt;img src=&quot;https://example.com/a.png&quot;&gt;">'
+            '<xhtml:iframe/></foreignObject>',
+        )
+        for fixture in fixtures:
+            source = f'<svg xmlns="http://www.w3.org/2000/svg">{fixture}</svg>'
+            with self.subTest(fixture=fixture), self.assertRaisesRegex(
+                ValueError, "runtime reference"
+            ):
+                validate_svg_source(source)
+
+    def test_rejects_path_shaped_smil_timing_references(self) -> None:
+        fixtures = (
+            ("begin", "timing.svg#event.begin"),
+            ("end", "../timing.svg#event.begin"),
+            ("begin", "/timing.svg#event.begin"),
+            ("end", "./timing.svg#event.end"),
+            ("begin", "assets/timing.svg#event.begin"),
+            ("end", r"C:\timing.svg#event.end"),
+        )
+        for attribute_name, value in fixtures:
+            source = (
+                '<svg xmlns="http://www.w3.org/2000/svg">'
+                f'<animate attributeName="opacity" {attribute_name}="{value}"/>'
+                "</svg>"
+            )
+            with self.subTest(attribute=attribute_name, value=value), self.assertRaises(
+                ValueError
+            ):
+                validate_svg_source(source)
+
+    def test_accepts_local_smil_timing_grammar(self) -> None:
+        source = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<g id="local-event"/>'
+            '<animate id="local-animation" attributeName="opacity" '
+            'begin="local-event.click;local-animation.end+1s;2s;'
+            'wallclock(2026-07-19T00:00:00Z);accessKey(/)+250ms" '
+            'end="local-event.mouseout;local-animation.begin+2s;indefinite"/>'
+            "</svg>"
+        )
+        self.assertIsNotNone(validate_svg_source(source))
+
     def test_rejects_css_escaped_remote_references(self) -> None:
         fixtures = (
             r'<style>.x{fill:u\72l(https://example.com/image.svg)}</style>',

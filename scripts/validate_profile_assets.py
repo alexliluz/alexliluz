@@ -54,6 +54,10 @@ SMIL_LOCAL_NAMES = {
 }
 SMIL_VALUE_ATTRIBUTE_NAMES = {"by", "from", "to", "values"}
 SMIL_TIMING_ATTRIBUTE_NAMES = {"begin", "end"}
+SMIL_LOCAL_TIMING_FUNCTION_PATTERN = re.compile(
+    r"(?:wallclock|accesskey)\([^)]*\)(?:[+-].+)?",
+    re.IGNORECASE,
+)
 MAX_SVG_BYTES = 2 * 1024 * 1024
 
 
@@ -147,6 +151,16 @@ def contains_external_smil_value(value: str) -> bool:
     )
 
 
+def contains_path_shaped_smil_timing(value: str) -> bool:
+    for candidate in value.split(";"):
+        compact = "".join(candidate.split())
+        if not compact or SMIL_LOCAL_TIMING_FUNCTION_PATTERN.fullmatch(compact):
+            continue
+        if any(separator in compact for separator in ("#", "/", "\\")):
+            return True
+    return False
+
+
 def has_unapproved_smil_reference(element: ET.Element) -> bool:
     if local_name(element.tag) not in SMIL_LOCAL_NAMES:
         return False
@@ -173,6 +187,7 @@ def has_unapproved_smil_reference(element: ET.Element) -> bool:
 
     return any(
         contains_external_smil_value(attributes[attribute_name])
+        or contains_path_shaped_smil_timing(attributes[attribute_name])
         for attribute_name in SMIL_TIMING_ATTRIBUTE_NAMES
         if attribute_name in attributes
     )
@@ -189,6 +204,8 @@ def has_remote_runtime_reference(root: ET.Element) -> bool:
         for attribute, value in element.attrib.items():
             attribute_name = local_name(attribute)
             if attribute == XML_BASE_ATTRIBUTE or attribute_name == "base":
+                return True
+            if attribute_name == "srcdoc":
                 return True
             if attribute_name in COMPOUND_URI_ATTRIBUTE_NAMES:
                 return True
