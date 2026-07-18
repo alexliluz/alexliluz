@@ -1,54 +1,75 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="title description">
-  <title id="title">Alex / ASEnough — Product OS</title>
-  <desc id="description">Alex builds practical, inspectable tools for AI-assisted software work, focused on AI coding, agent workflows, and developer tools.</desc>
+  <title id="title">Alex / ASEnough — Product OS · Agent Console</title>
+  <desc id="description">Alex builds practical, inspectable tools for AI-assisted software work in a Midnight Aurora system interface.</desc>
+  <defs>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#58A6FF"/>
+      <stop offset="0.55" stop-color="#A371F7"/>
+      <stop offset="1" stop-color="#3FB950"/>
+    </linearGradient>
+    <clipPath id="frame-clip"><rect x="1" y="1" width="958" height="278" rx="18"/></clipPath>
+  </defs>
   <style>
-    .surface { fill: #0D1117; stroke: #30363D; }
-    .accent-line { fill: #58A6FF; }
-    .status-surface { fill: #161B22; stroke: #30363D; }
-    .divider { stroke: #30363D; }
-    .primary { fill: #F0F6FC; }
-    .muted { fill: #8B949E; }
-    .blue { fill: #58A6FF; }
-    .green { fill: #3FB950; }
-    .identity,
-    .label,
-    .prompt,
-    .status-text {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    .surface { fill:#0D1117; stroke:#30363D; }
+    .panel { fill:#161B22; stroke:#30363D; }
+    .primary { fill:#F0F6FC; }
+    .muted { fill:#8B949E; }
+    .blue { fill:#58A6FF; }
+    .violet { fill:#A371F7; }
+    .green { fill:#3FB950; }
+    .grid { stroke:#21262D; opacity:.7; }
+    .beam { fill:url(#aurora); }
+    .scan { fill:#58A6FF; opacity:0; animation:scan 8s ease-in-out infinite; }
+    .node { animation:pulse 3.2s ease-in-out infinite; }
+    .node.violet { animation-delay:1.1s; }
+    .node.green { animation-delay:2.1s; }
+    .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; }
+    .sans { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .eyebrow { font-size:13px; font-weight:700; letter-spacing:1.8px; }
+    .headline { font-size:34px; font-weight:720; }
+    .label { font-size:13px; font-weight:650; letter-spacing:1px; }
+    .status { font-size:12px; font-weight:700; letter-spacing:.8px; }
+    @keyframes scan {
+      0%,18% { opacity:0; transform:translateX(-180px); }
+      24% { opacity:.18; }
+      55% { opacity:.06; transform:translateX(980px); }
+      56%,100% { opacity:0; transform:translateX(980px); }
     }
-    .identity { font-size: 15px; font-weight: 700; letter-spacing: 2px; }
-    .headline { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 32px; font-weight: 700; }
-    .label { font-size: 13px; font-weight: 600; letter-spacing: 1.1px; }
-    .prompt { font-size: 15px; }
-    .status-text { font-size: 12px; font-weight: 700; letter-spacing: 0.8px; }
+    @keyframes pulse {
+      0%,100% { opacity:.45; }
+      50% { opacity:1; }
+    }
     @media (prefers-color-scheme: light) {
-      .surface { fill: #FFFFFF; stroke: #D0D7DE; }
-      .status-surface { fill: #F6F8FA; stroke: #D0D7DE; }
-      .divider { stroke: #D0D7DE; }
-      .primary { fill: #1F2328; }
-      .muted { fill: #59636E; }
-      .blue { fill: #0969DA; }
-      .green { fill: #1A7F37; }
+      .surface { fill:#FFFFFF; stroke:#D0D7DE; }
+      .panel { fill:#F6F8FA; stroke:#D0D7DE; }
+      .primary { fill:#1F2328; }
+      .muted { fill:#59636E; }
+      .blue { fill:#0969DA; }
+      .violet { fill:#8250DF; }
+      .green { fill:#1A7F37; }
+      .grid { stroke:#D8DEE4; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .scan,.node { animation:none; }
+      .scan { display:none; }
+      .node { opacity:1; }
     }
   </style>
   <rect class="surface" x="1" y="1" width="958" height="278" rx="18"/>
-  <rect class="accent-line" x="28" y="28" width="4" height="28" rx="2"/>
-  <text class="identity primary" x="48" y="49">ALEX / ASENOUGH</text>
-
-  <rect class="status-surface" x="782" y="27" width="150" height="32" rx="16"/>
-  <rect class="green" x="798" y="40" width="7" height="7" rx="3.5"/>
-  <text class="status-text green" x="815" y="48">BUILD: ACTIVE</text>
-
-  <text class="headline primary" x="28" y="108">Building practical, inspectable tools for</text>
-  <text class="headline primary" x="28" y="148">AI-assisted software work.</text>
-
-  <text class="label blue" x="28" y="194">AI CODING</text>
-  <text class="label muted" x="129" y="194">·</text>
-  <text class="label blue" x="150" y="194">AGENT WORKFLOWS</text>
-  <text class="label muted" x="302" y="194">·</text>
-  <text class="label blue" x="323" y="194">DEVELOPER TOOLS</text>
-
-  <line class="divider" x1="28" y1="217" x2="932" y2="217"/>
-  <text class="prompt green" x="28" y="250">alex@github:~$</text>
-  <text class="prompt muted" x="176" y="250">turning demos into repeatable systems_</text>
+  <g clip-path="url(#frame-clip)">
+    <path class="grid" d="M28 74H932M28 218H932M650 28V252M734 28V252M818 28V252M902 28V252"/>
+    <rect class="scan" x="-180" y="1" width="180" height="278"/>
+  </g>
+  <text class="mono eyebrow blue" x="28" y="47">PRODUCT OS · AGENT CONSOLE</text>
+  <rect class="panel" x="766" y="26" width="166" height="32" rx="16"/>
+  <circle class="node green" cx="783" cy="42" r="4"/>
+  <text class="mono status green" x="796" y="47">SYSTEM: ACTIVE</text>
+  <text class="sans headline primary" x="28" y="116">Alex / ASEnough</text>
+  <text class="sans headline primary" x="28" y="160">Building practical, inspectable tools for</text>
+  <text class="sans headline primary" x="28" y="201">AI-assisted software work.</text>
+  <rect class="beam" x="28" y="225" width="904" height="3" rx="1.5"/>
+  <circle class="node blue" cx="38" cy="250" r="4"/>
+  <circle class="node violet" cx="52" cy="250" r="4"/>
+  <circle class="node green" cx="66" cy="250" r="4"/>
+  <text class="mono label muted" x="86" y="255">AI CODING · AGENT WORKFLOWS · DEVELOPER TOOLS</text>
 </svg>
