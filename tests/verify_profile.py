@@ -364,8 +364,12 @@ class ProfileContractTests(unittest.TestCase):
             "contribution-signal-dark-static.svg",
         )
         compose = step_block("Compose Contribution Signal assets")
+        self.assertNotIn(
+            "python3 scripts/compose_contribution_signal.py",
+            compose,
+        )
         compose_commands = (
-            "python3 scripts/compose_contribution_signal.py \\",
+            "python3 -m scripts.compose_contribution_signal \\",
             "--city-light .tmp/profile-output/profile-3d-light.svg \\",
             "--city-dark .tmp/profile-output/profile-3d-dark.svg \\",
             "--snake-light .tmp/profile-output/contribution-snake-light.svg \\",
