@@ -39,53 +39,70 @@ class ProfileContractTests(unittest.TestCase):
         for path in (README, HERO, WORKFLOW, VALIDATOR):
             self.assertTrue(path.is_file(), f"{path.relative_to(ROOT)} must exist")
 
-    def test_identity_and_v3_sections_are_present_in_order(self) -> None:
+    def test_compact_identity_sections_are_present_in_order(self) -> None:
         text = self.read_readme()
         required = (
-            "# Hi, I'm Alex / ASEnough.",
-            "## Selected Systems",
-            "## Contribution City",
-            "## Operating Signals",
-            "### Now",
-            "### Core Stack",
-            "### Principles",
-            "## Contribution Trail",
+            "# Hi, I'm Alex / ASEnough 👋",
+            "## About me",
+            "## Tech stack",
+            "## Featured work",
+            "## Neon Contribution City",
+            "## Contribution Snake",
             "[Explore all repositories →]",
         )
         positions = [text.index(fragment) for fragment in required]
         self.assertEqual(positions, sorted(positions))
         self.assertIn(
-            "我在做更实用、可检查、可复现的 AI Coding 与 Agent 工作流工具。",
+            "I build practical AI Coding tools and reproducible agent workflows.",
             text,
         )
         self.assertIn(
-            "Turning agent demos into repeatable engineering workflows.",
+            "我专注于 AI Coding、Agent 工作流和实用开发工具。",
             text,
         )
-        self.assertIn(
-            "`TypeScript` · `Python` · `CLI` · `GitHub Automation` · "
-            "`Agent Workflows`",
-            text,
-        )
-        self.assertIn(
-            "`Inspectable artifacts` · `Reproducible workflows` · "
-            "`Useful before impressive`",
-            text,
-        )
+        for fact in (
+            "Building practical tools for AI-assisted software work.",
+            "Planarian, ForkNeo, and api-image-neo.",
+            "TypeScript, Python, Node.js, and GitHub Actions.",
+            "Reproducible, inspectable workflows over opaque demos.",
+        ):
+            self.assertIn(fact, text)
 
-    def test_selected_work_contains_exactly_the_three_owned_projects(self) -> None:
+    def test_static_technology_badges_are_present(self) -> None:
         text = self.read_readme()
-        repo_names = set(
-            re.findall(r"https://github\.com/alexliluz/([A-Za-z0-9_.-]+)", text)
+        expected_labels = (
+            "TypeScript-3178C6",
+            "Python-3776AB",
+            "Node.js-339933",
+            "GitHub_Actions-2088FF",
+            "AI_Agents-8B5CF6",
         )
-        self.assertEqual(repo_names, {"planarian", "ForkNeo", "api-image-neo"})
-        self.assertNotIn("linuxdo-scripts-neo", text)
-        for lead in (
+        self.assertEqual(text.count("https://img.shields.io/badge/"), 5)
+        for label in expected_labels:
+            self.assertIn(f"https://img.shields.io/badge/{label}", text)
+
+    def test_featured_work_is_one_compact_line_with_three_owned_projects(
+        self,
+    ) -> None:
+        text = self.read_readme()
+        repo_names = re.findall(
+            r"https://github\.com/alexliluz/([A-Za-z0-9_.-]+)", text
+        )
+        self.assertEqual(repo_names, ["planarian", "ForkNeo", "api-image-neo"])
+        self.assertIn(
+            "[Planarian](https://github.com/alexliluz/planarian) · "
+            "[ForkNeo](https://github.com/alexliluz/ForkNeo) · "
+            "[api-image-neo](https://github.com/alexliluz/api-image-neo)",
+            text,
+        )
+        for removed_copy in (
             "Reproducible UI reconstruction workflows for coding agents.",
             "Safe fork-to-independent repository migration without losing history.",
             "Provider-flexible image generation workflows for Codex.",
+            "## Selected Systems",
+            "## Operating Signals",
         ):
-            self.assertIn(lead, text)
+            self.assertNotIn(removed_copy, text)
 
     def test_final_action_links_to_all_repositories(self) -> None:
         text = self.read_readme()
@@ -101,11 +118,12 @@ class ProfileContractTests(unittest.TestCase):
         self.assertEqual(text.count("</picture>"), 2)
         for asset in GENERATED_ASSETS:
             self.assertIn(f"{GENERATED_ASSET_BASE}{asset}", text)
-        remote_sources = re.findall(
-            r'(?:src|srcset)=["\'](https?://[^"\']+)["\']', text
+        generated_sources = re.findall(
+            rf'(?:src|srcset)=["\']({re.escape(GENERATED_ASSET_BASE)}[^"\']+)["\']',
+            text,
         )
-        self.assertEqual(len(remote_sources), 6)
-        for source in remote_sources:
+        self.assertEqual(len(generated_sources), 6)
+        for source in generated_sources:
             self.assertTrue(source.startswith(GENERATED_ASSET_BASE), source)
         self.assertRegex(
             text,
@@ -129,7 +147,6 @@ class ProfileContractTests(unittest.TestCase):
             "readme-typing-svg",
             "spotify-github-profile",
             "wakatime",
-            "shields.io",
             "demolab.com",
             "vercel.app",
             "herokuapp.com",
@@ -142,16 +159,10 @@ class ProfileContractTests(unittest.TestCase):
         self.assertNotIn("linuxdo-scripts-neo", text)
         self.assertNotIn("## Connect", text)
 
-    def test_local_hero_reference_resolves(self) -> None:
+    def test_local_hero_is_retained_but_not_rendered(self) -> None:
         text = self.read_readme()
-        match = re.search(
-            r'<img[^>]+src=["\'](\./assets/profile-hero\.svg)["\'][^>]*>',
-            text,
-        )
-        self.assertIsNotNone(match, "README must reference the local V3 hero SVG")
-        self.assertIn("alt=", match.group(0))
-        self.assertIn('width="100%"', match.group(0))
-        self.assertTrue((ROOT / match.group(1)).resolve().is_file())
+        self.assertTrue(HERO.is_file())
+        self.assertNotIn("./assets/profile-hero.svg", text)
 
     def test_svg_is_accessible_responsive_animated_and_theme_aware(self) -> None:
         self.assertTrue(HERO.is_file(), "assets/profile-hero.svg must exist")

@@ -1,38 +1,30 @@
-<img src="./assets/profile-hero.svg" alt="Alex / ASEnough builds practical, inspectable tools for AI-assisted software work" width="100%">
+# Hi, I'm Alex / ASEnough 👋
 
-# Hi, I'm Alex / ASEnough.
+I build practical AI Coding tools and reproducible agent workflows.
+我专注于 AI Coding、Agent 工作流和实用开发工具。
 
-我在做更实用、可检查、可复现的 AI Coding 与 Agent 工作流工具。
+## About me
 
-## Selected Systems
+- 🔭 Building practical tools for AI-assisted software work.
+- 🧪 Representative projects: Planarian, ForkNeo, and api-image-neo.
+- 🛠 Working mainly with TypeScript, Python, Node.js, and GitHub Actions.
+- ⚙️ Reproducible, inspectable workflows over opaque demos.
 
-### [01 / Planarian](https://github.com/alexliluz/planarian)
+## Tech stack
 
-`Experimental` · `Agent Workflow` · `TypeScript`
+<p>
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions">
+  <img src="https://img.shields.io/badge/AI_Agents-8B5CF6?style=flat-square&logo=openai&logoColor=white" alt="AI Agents">
+</p>
 
-**Reproducible UI reconstruction workflows for coding agents.**
+## Featured work
 
-Planarian turns visual reconstruction into an inspectable process with stable artifacts, task bundles, validation commands, and explicit agent handoffs.
+[Planarian](https://github.com/alexliluz/planarian) · [ForkNeo](https://github.com/alexliluz/ForkNeo) · [api-image-neo](https://github.com/alexliluz/api-image-neo)
 
-### [02 / ForkNeo](https://github.com/alexliluz/ForkNeo)
-
-`Active` · `CLI` · `GitHub Automation` · `TypeScript`
-
-**Safe fork-to-independent repository migration without losing history.**
-
-ForkNeo preserves branches, tags, default-branch state, and Git LFS objects, then verifies the independent repository.
-
-### [03 / api-image-neo](https://github.com/alexliluz/api-image-neo)
-
-`Active` · `Codex Skill` · `Image Generation` · `Python`
-
-**Provider-flexible image generation workflows for Codex.**
-
-The skill supports generation, reference-image workflows, and editing through OpenAI-compatible providers while reusing existing Codex configuration.
-
-## Contribution City
-
-Daily GitHub activity, rendered as a 3D contribution city.
+## Neon Contribution City
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/profile-3d-dark.svg">
@@ -40,23 +32,7 @@ Daily GitHub activity, rendered as a 3D contribution city.
   <img src="https://raw.githubusercontent.com/alexliluz/alexliluz/output/profile-3d-light.svg" alt="3D contribution city generated from Alex's GitHub contribution calendar" width="100%">
 </picture>
 
-## Operating Signals
-
-### Now
-
-Turning agent demos into repeatable engineering workflows.
-
-把 Agent Demo 变成可复现、可验证、可长期维护的工程工作流。
-
-### Core Stack
-
-`TypeScript` · `Python` · `CLI` · `GitHub Automation` · `Agent Workflows`
-
-### Principles
-
-`Inspectable artifacts` · `Reproducible workflows` · `Useful before impressive`
-
-## Contribution Trail
+## Contribution Snake
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-snake-dark.svg">
