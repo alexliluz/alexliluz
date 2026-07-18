@@ -7,21 +7,18 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from scripts.profile_star_history import load_history
+from scripts.validate_profile_assets import (
+    MAX_SVG_BYTES,
+    local_name,
+    validate_svg,
+    validate_svg_source,
+)
 
 
-SVG_TAG = "{http://www.w3.org/2000/svg}svg"
-MAX_BYTES = 2 * 1024 * 1024
-SMIL_PATTERN = re.compile(
-    r"<(?:animate|animateMotion|animateTransform|set)\b[^>]*"
-    r"(?:/>|>.*?</(?:animate|animateMotion|animateTransform|set)>)",
-    re.IGNORECASE | re.DOTALL,
-)
-CSS_ANIMATION_PATTERN = re.compile(
-    r"animation(?:-[a-z-]+)?\s*:[^;}]+;?",
-    re.IGNORECASE,
-)
-EXTERNAL_REFERENCE_PATTERN = re.compile(
-    r'(?:href|src)\s*=\s*["\']\s*https?://',
+MAX_BYTES = MAX_SVG_BYTES
+SMIL_LOCAL_NAMES = {"animate", "animatemotion", "animatetransform", "set"}
+CSS_ANIMATION_DECLARATION_PATTERN = re.compile(
+    r"(^|[;{])\s*animation(?:-[a-z-]+)?\s*:\s*[^;{}]*(?:;|(?=}|$))",
     re.IGNORECASE,
 )
 
@@ -44,42 +41,35 @@ THEMES = {
 }
 
 
-def has_external_http_reference(source: str, root: ET.Element) -> bool:
-    if EXTERNAL_REFERENCE_PATTERN.search(source):
-        return True
-    for element in root.iter():
-        for attribute, value in element.attrib.items():
-            if attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "src"}:
-                if value.strip().lower().startswith(("http://", "https://")):
-                    return True
-    return False
-
-
 def read_safe_svg(path: Path) -> str:
-    if not path.is_file():
-        raise ValueError(f"missing SVG: {path}")
-    if path.stat().st_size > MAX_BYTES:
-        raise ValueError(f"SVG exceeds 2 MiB: {path}")
+    validate_svg(path)
     try:
         source = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as error:
         raise ValueError(f"SVG is not UTF-8 text: {path}") from error
-    try:
-        root = ET.fromstring(source)
-    except ET.ParseError as error:
-        raise ValueError(f"invalid SVG {path}: {error}") from error
-    if root.tag != SVG_TAG:
-        raise ValueError(f"not an SVG: {path}")
-    if "<script" in source.lower():
-        raise ValueError(f"script is forbidden in {path}")
-    if has_external_http_reference(source, root):
-        raise ValueError(f"external HTTP reference is forbidden in {path}")
     return source
 
 
+def strip_css_animation_declarations(css: str) -> str:
+    return CSS_ANIMATION_DECLARATION_PATTERN.sub(r"\1", css)
+
+
 def static_source(source: str) -> str:
-    source = SMIL_PATTERN.sub("", source)
-    return CSS_ANIMATION_PATTERN.sub("", source)
+    root = ET.fromstring(source)
+    for parent in root.iter():
+        for child in list(parent):
+            if local_name(child.tag) in SMIL_LOCAL_NAMES:
+                parent.remove(child)
+    for element in root.iter():
+        if local_name(element.tag) == "style":
+            element.text = strip_css_animation_declarations(element.text or "")
+        if "style" in element.attrib:
+            element.attrib["style"] = strip_css_animation_declarations(
+                element.attrib["style"]
+            )
+    static = ET.tostring(root, encoding="unicode")
+    ET.fromstring(static)
+    return static
 
 
 def data_uri(source: str) -> str:
@@ -115,6 +105,8 @@ def compose(
     static: bool,
 ) -> str:
     theme = THEMES[theme_name]
+    validate_svg_source(city_source)
+    validate_svg_source(snake_source)
     if static:
         city_source = static_source(city_source)
         snake_source = static_source(snake_source)
@@ -142,16 +134,7 @@ def compose(
   <image x="20" y="500" width="920" height="140" preserveAspectRatio="xMidYMid meet" href="{data_uri(snake_source)}"/>
 </svg>
 '''
-    if len(source.encode("utf-8")) > MAX_BYTES:
-        raise ValueError("composed SVG exceeds 2 MiB")
-    if "<script" in source.lower():
-        raise ValueError("composed SVG contains script content")
-    try:
-        root = ET.fromstring(source)
-    except ET.ParseError as error:
-        raise ValueError(f"invalid composed SVG: {error}") from error
-    if has_external_http_reference(source, root):
-        raise ValueError("composed SVG contains an external HTTP reference")
+    validate_svg_source(source)
     return source
 
 

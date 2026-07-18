@@ -7,25 +7,58 @@ from pathlib import Path
 
 
 SVG_TAG = "{http://www.w3.org/2000/svg}svg"
+XML_BASE_ATTRIBUTE = "{http://www.w3.org/XML/1998/namespace}base"
 CREDENTIAL_PATTERN = re.compile(
     r"(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})"
 )
-MAX_SVG_BYTES = 2 * 1024 * 1024
-EXTERNAL_REFERENCE_PATTERN = re.compile(
-    r'(?:href|src)\s*=\s*["\']\s*https?://',
+CSS_REMOTE_URL_PATTERN = re.compile(
+    r"url\(\s*(?:['\"]\s*)?(?:(?:https?:)?//)",
     re.IGNORECASE,
 )
+MAX_SVG_BYTES = 2 * 1024 * 1024
 
 
-def has_external_http_reference(source: str, root: ET.Element) -> bool:
-    if EXTERNAL_REFERENCE_PATTERN.search(source):
-        return True
+def local_name(name: str) -> str:
+    return name.rsplit("}", maxsplit=1)[-1].lower()
+
+
+def is_remote_url(value: str) -> bool:
+    return value.strip().lower().startswith(("http://", "https://", "//"))
+
+
+def has_remote_runtime_reference(root: ET.Element) -> bool:
     for element in root.iter():
+        if local_name(element.tag) == "style" and CSS_REMOTE_URL_PATTERN.search(
+            element.text or ""
+        ):
+            return True
         for attribute, value in element.attrib.items():
-            if attribute.rsplit("}", maxsplit=1)[-1].lower() in {"href", "src"}:
-                if value.strip().lower().startswith(("http://", "https://")):
-                    return True
+            attribute_name = local_name(attribute)
+            if attribute == XML_BASE_ATTRIBUTE and is_remote_url(value):
+                return True
+            if attribute_name in {"href", "src"} and is_remote_url(value):
+                return True
+            if CSS_REMOTE_URL_PATTERN.search(value):
+                return True
     return False
+
+
+def validate_svg_source(source: str) -> ET.Element:
+    if len(source.encode("utf-8")) >= MAX_SVG_BYTES:
+        raise ValueError("file exceeds 2 MiB")
+    if CREDENTIAL_PATTERN.search(source):
+        raise ValueError("file contains credential-like text")
+    try:
+        root = ET.fromstring(source)
+    except ET.ParseError as error:
+        raise ValueError(f"invalid XML: {error}") from error
+    if root.tag != SVG_TAG:
+        raise ValueError(f"root element is {root.tag!r}, not SVG")
+    if any(local_name(element.tag) == "script" for element in root.iter()):
+        raise ValueError("file contains script content")
+    if has_remote_runtime_reference(root):
+        raise ValueError("file contains an external runtime reference")
+    return root
 
 
 def validate_svg(path: Path) -> None:
@@ -33,30 +66,14 @@ def validate_svg(path: Path) -> None:
         raise ValueError("file does not exist")
     if path.stat().st_size == 0:
         raise ValueError("file is empty")
-    if path.stat().st_size > MAX_SVG_BYTES:
+    if path.stat().st_size >= MAX_SVG_BYTES:
         raise ValueError("file exceeds 2 MiB")
 
     try:
         source = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as error:
         raise ValueError("file is not UTF-8 text") from error
-
-    if CREDENTIAL_PATTERN.search(source):
-        raise ValueError("file contains credential-like text")
-    if "<script" in source.lower():
-        raise ValueError("file contains script content")
-    if EXTERNAL_REFERENCE_PATTERN.search(source):
-        raise ValueError("file contains an external HTTP reference")
-
-    try:
-        root = ET.fromstring(source)
-    except ET.ParseError as error:
-        raise ValueError(f"invalid XML: {error}") from error
-
-    if root.tag != SVG_TAG:
-        raise ValueError(f"root element is {root.tag!r}, not SVG")
-    if has_external_http_reference(source, root):
-        raise ValueError("file contains an external HTTP reference")
+    validate_svg_source(source)
 
 
 def main() -> int:

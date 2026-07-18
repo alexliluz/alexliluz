@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_profile_assets import validate_svg
+from scripts.validate_profile_assets import MAX_SVG_BYTES, validate_svg, validate_svg_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,14 +51,22 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "credential-like"):
                 validate_svg(path)
 
-    def test_rejects_scripts_external_images_and_oversized_svg(self) -> None:
+    def test_rejects_scripts_remote_runtime_references_and_size_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             directory = Path(temporary_directory)
+            prefix = '<svg xmlns="http://www.w3.org/2000/svg"><desc>'
+            suffix = "</desc></svg>"
             fixtures = (
                 self.write_fixture(
                     directory,
                     "script.svg",
                     '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "namespaced-script.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg" '
+                    'xmlns:s="http://www.w3.org/2000/svg"><s:script>x()</s:script></svg>',
                 ),
                 self.write_fixture(
                     directory,
@@ -74,6 +82,24 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
                 ),
                 self.write_fixture(
                     directory,
+                    "protocol-relative.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<image href="//example.com/image.svg"/></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "xml-base.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg" '
+                    'xml:base="https://example.com/"><image href="image.svg"/></svg>',
+                ),
+                self.write_fixture(
+                    directory,
+                    "css-remote.svg",
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<style>.x{fill:url(//example.com/image.svg)}</style></svg>',
+                ),
+                self.write_fixture(
+                    directory,
                     "large.svg",
                     '<svg xmlns="http://www.w3.org/2000/svg"><desc>'
                     + ("x" * (2 * 1024 * 1024))
@@ -83,6 +109,16 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
             for path in fixtures:
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     validate_svg(path)
+
+            equal_limit = self.write_fixture(
+                directory,
+                "equal-limit.svg",
+                prefix + ("x" * (MAX_SVG_BYTES - len(prefix) - len(suffix))) + suffix,
+            )
+            with self.assertRaisesRegex(ValueError, "2 MiB"):
+                validate_svg(equal_limit)
+            with self.assertRaisesRegex(ValueError, "2 MiB"):
+                validate_svg_source(equal_limit.read_text(encoding="utf-8"))
 
     def test_cli_reports_the_invalid_path_and_returns_nonzero(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
