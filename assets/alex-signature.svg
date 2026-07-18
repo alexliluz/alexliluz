@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 220" role="img" aria-labelledby="title description">
+  <title id="title">Alex — building tools that stay inspectable</title>
+  <desc id="description">Handwritten Alex signature above a technical engineering motto.</desc>
+  <!-- Generated from Kalam Bold, licensed under the SIL Open Font License 1.1. -->
+  <style>
+    .signature { fill: #F0F6FC; }
+    .shadow { fill: #6D28D9; }
+    .subtitle { fill: #FF7B72; }
+    @media (prefers-color-scheme: light) {
+      .signature { fill: #24292F; }
+      .shadow { fill: #8250DF; }
+      .subtitle { fill: #CF222E; }
+    }
+  </style>
+  <defs><g id="signature-outline"><path d="M509 388Q549 388 566.5 380.5Q584 373 584 353Q584 326 497 298Q499 222 499.0 152.5Q499 83 488.0 48.5Q477 14 453.0 14.0Q429 14 415.5 38.5Q402 63 393.5 119.0Q385 175 376 267Q274 244 229 230Q151 14 125 14Q104 14 69.5 42.0Q35 70 35 100Q35 117 74 206Q57 217 44.5 237.5Q32 258 32 277Q32 310 131 340Q139 360 147.5 385.5Q156 411 190.5 505.0Q225 599 245 662Q254 692 307.5 718.0Q361 744 391 744Q426 744 453.5 647.0Q481 550 492 388ZM278 371Q308 375 365 381Q362 410 355.5 480.0Q349 550 346 581Q329 525 278 371Z" transform="translate(0 0)"/><path d="M229 374Q146 12 113 12Q91 12 58.5 47.5Q26 83 26 106Q26 108 53.0 210.0Q80 312 107.5 472.5Q135 633 135 779Q135 808 166 808Q190 808 228.0 764.0Q266 720 266.0 680.0Q266 640 254.0 537.5Q242 435 229 374Z" transform="translate(630 0)"/><path d="M155 224Q146 197 146.0 170.0Q146 143 155.0 131.5Q164 120 200 120Q275 120 328.5 134.0Q382 148 384 148Q425 148 425 121Q425 82 360.5 47.0Q296 12 211.5 12.0Q127 12 76.0 65.0Q25 118 25.0 190.5Q25 263 67.5 342.0Q110 421 174.0 474.5Q238 528 301.5 528.0Q365 528 419.0 465.5Q473 403 473 341Q473 292 406.5 253.0Q340 214 270.0 214.0Q200 214 155 224ZM194 310Q203 309 220 309Q357 309 357 357Q357 367 336.0 386.0Q315 405 296.5 405.0Q278 405 249.0 378.5Q220 352 194 310Z" transform="translate(896 0)"/><path d="M404 49Q404 12 371 12Q317 12 229 144Q115 12 76 12Q49 12 24.5 38.5Q0 65 0 85Q0 90 21 110Q104 189 160 259Q117 337 87.0 408.0Q57 479 57.0 494.5Q57 510 58 515Q61 528 76 528Q118 528 164.5 511.5Q211 495 211 473Q211 438 241 371Q302 457 340.5 493.0Q379 529 403.5 529.0Q428 529 458.5 500.0Q489 471 489 448Q489 437 480.0 427.0Q471 417 453.0 403.5Q435 390 418.5 373.0Q402 356 309 242L338 191Q404 75 404 49Z" transform="translate(1384 0)"/></g></defs>
+  <g class="shadow" transform="translate(7 7)"><use href="#signature-outline" transform="translate(315.000 132) scale(0.1776103 -0.1776103)"/></g>
+  <g class="signature"><use href="#signature-outline" transform="translate(315.000 132) scale(0.1776103 -0.1776103)"/></g>
+  <text class="subtitle" x="480" y="190" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24" font-weight="600" letter-spacing="5">BUILDING TOOLS THAT STAY INSPECTABLE</text>
+</svg>
