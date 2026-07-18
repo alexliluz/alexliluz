@@ -1,14 +1,7 @@
-# Hi, I'm Alex / ASEnough 👋
+<img src="./assets/alex-signature.svg" alt="Alex — building tools that stay inspectable" width="100%">
 
-I build practical AI Coding tools and reproducible agent workflows.
-我专注于 AI Coding、Agent 工作流和实用开发工具。
-
-## About me
-
-- 🔭 Building practical tools for AI-assisted software work.
-- 🧪 Representative projects: Planarian, ForkNeo, and api-image-neo.
-- 🛠 Working mainly with TypeScript, Python, Node.js, and GitHub Actions.
-- ⚙️ Reproducible, inspectable workflows over opaque demos.
+TypeScript / Python developer focused on developer tooling, CLI automation, and reproducible systems.
+主要使用 TypeScript、Python 与 Node.js，专注开发者工具、CLI 自动化和可复现工程工作流。
 
 ## Tech stack
 
@@ -17,27 +10,20 @@ I build practical AI Coding tools and reproducible agent workflows.
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions">
-  <img src="https://img.shields.io/badge/AI_Agents-8B5CF6?style=flat-square&logo=openai&logoColor=white" alt="AI Agents">
 </p>
 
 ## Featured work
 
-[Planarian](https://github.com/alexliluz/planarian) · [ForkNeo](https://github.com/alexliluz/ForkNeo) · [api-image-neo](https://github.com/alexliluz/api-image-neo)
+[Planarian](https://github.com/alexliluz/planarian) <img src="https://img.shields.io/github/stars/alexliluz/planarian?style=flat-square&label=stars&color=8250DF" alt="Planarian stars"> · [ForkNeo](https://github.com/alexliluz/ForkNeo) <img src="https://img.shields.io/github/stars/alexliluz/ForkNeo?style=flat-square&label=stars&color=8250DF" alt="ForkNeo stars"> · [api-image-neo](https://github.com/alexliluz/api-image-neo) <img src="https://img.shields.io/github/stars/alexliluz/api-image-neo?style=flat-square&label=stars&color=8250DF" alt="api-image-neo stars">
 
-## Neon Contribution City
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/profile-3d-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/profile-3d-light.svg">
-  <img src="https://raw.githubusercontent.com/alexliluz/alexliluz/output/profile-3d-light.svg" alt="3D contribution city generated from Alex's GitHub contribution calendar" width="100%">
-</picture>
-
-## Contribution Snake
+## Contribution Signal
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-snake-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-snake-light.svg">
-  <img src="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-snake-light.svg" alt="Animated contribution snake traversing Alex's GitHub contribution grid" width="100%">
+  <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-dark-static.svg">
+  <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light-static.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light.svg">
+  <img src="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light.svg" alt="Alex contribution signal: Star trend, 3D contribution city, and original animated contribution-grid snake" width="100%">
 </picture>
 
 ---

@@ -44,6 +44,41 @@ jobs:
           cp dist/contribution-snake-light.svg .tmp/profile-output/contribution-snake-light.svg
           cp dist/contribution-snake-dark.svg .tmp/profile-output/contribution-snake-dark.svg
 
+      - name: Restore previous Star snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .tmp/previous-star-history.json
+          if git ls-remote --exit-code --heads origin output >/dev/null 2>&1; then
+            git fetch origin output
+            if git cat-file -e origin/output:star-history.json 2>/dev/null; then
+              git show origin/output:star-history.json > .tmp/previous-star-history.json
+            fi
+          fi
+
+      - name: Record current Star counts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/profile_star_history.py \
+            --history .tmp/previous-star-history.json \
+            --output .tmp/profile-output/star-history.json \
+            --owner "${{ github.repository_owner }}"
+
+      - name: Compose Contribution Signal assets
+        run: |
+          python3 scripts/compose_contribution_signal.py \
+            --city-light .tmp/profile-output/profile-3d-light.svg \
+            --city-dark .tmp/profile-output/profile-3d-dark.svg \
+            --snake-light .tmp/profile-output/contribution-snake-light.svg \
+            --snake-dark .tmp/profile-output/contribution-snake-dark.svg \
+            --history .tmp/profile-output/star-history.json \
+            --output-dir .tmp/profile-output
+          test -f .tmp/profile-output/contribution-signal-light.svg
+          test -f .tmp/profile-output/contribution-signal-dark.svg
+          test -f .tmp/profile-output/contribution-signal-light-static.svg
+          test -f .tmp/profile-output/contribution-signal-dark-static.svg
+
       - name: Validate generated SVGs
         run: python3 scripts/validate_profile_assets.py .tmp/profile-output/*.svg
 
@@ -62,6 +97,7 @@ jobs:
             git -C .tmp/output-branch rm -rf .
           fi
           cp .tmp/profile-output/*.svg .tmp/output-branch/
+          cp .tmp/profile-output/star-history.json .tmp/output-branch/
           touch .tmp/output-branch/.nojekyll
           git -C .tmp/output-branch add .
           if git -C .tmp/output-branch diff --cached --quiet; then

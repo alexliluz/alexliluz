@@ -11,16 +11,19 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 HERO = ROOT / "assets" / "profile-hero.svg"
+SIGNATURE = ROOT / "assets" / "alex-signature.svg"
 WORKFLOW = ROOT / ".github" / "workflows" / "generate-profile-assets.yml"
 VALIDATOR = ROOT / "scripts" / "validate_profile_assets.py"
+COMPOSER = ROOT / "scripts" / "compose_contribution_signal.py"
+STAR_HISTORY = ROOT / "scripts" / "profile_star_history.py"
 GENERATED_ASSET_BASE = (
     "https://raw.githubusercontent.com/alexliluz/alexliluz/output/"
 )
-GENERATED_ASSETS = (
-    "profile-3d-light.svg",
-    "profile-3d-dark.svg",
-    "contribution-snake-light.svg",
-    "contribution-snake-dark.svg",
+SIGNAL_ASSETS = (
+    "contribution-signal-light.svg",
+    "contribution-signal-dark.svg",
+    "contribution-signal-light-static.svg",
+    "contribution-signal-dark-static.svg",
 )
 PROFILE_URLS = (
     "https://github.com/alexliluz/planarian",
@@ -36,65 +39,80 @@ class ProfileContractTests(unittest.TestCase):
         return README.read_text(encoding="utf-8")
 
     def test_required_files_exist(self) -> None:
-        for path in (README, HERO, WORKFLOW, VALIDATOR):
+        for path in (
+            README,
+            HERO,
+            SIGNATURE,
+            WORKFLOW,
+            VALIDATOR,
+            COMPOSER,
+            STAR_HISTORY,
+        ):
             self.assertTrue(path.is_file(), f"{path.relative_to(ROOT)} must exist")
 
-    def test_compact_identity_sections_are_present_in_order(self) -> None:
+    def test_v4_sections_and_positioning_are_present_in_order(self) -> None:
         text = self.read_readme()
         required = (
-            "# Hi, I'm Alex / ASEnough 👋",
-            "## About me",
+            "./assets/alex-signature.svg",
+            "TypeScript / Python developer focused on developer tooling, "
+            "CLI automation, and reproducible systems.",
             "## Tech stack",
             "## Featured work",
-            "## Neon Contribution City",
-            "## Contribution Snake",
+            "## Contribution Signal",
             "[Explore all repositories →]",
         )
         positions = [text.index(fragment) for fragment in required]
         self.assertEqual(positions, sorted(positions))
         self.assertIn(
-            "I build practical AI Coding tools and reproducible agent workflows.",
+            "主要使用 TypeScript、Python 与 Node.js，专注开发者工具、"
+            "CLI 自动化和可复现工程工作流。",
             text,
         )
-        self.assertIn(
-            "我专注于 AI Coding、Agent 工作流和实用开发工具。",
-            text,
-        )
-        for fact in (
-            "Building practical tools for AI-assisted software work.",
-            "Planarian, ForkNeo, and api-image-neo.",
-            "TypeScript, Python, Node.js, and GitHub Actions.",
-            "Reproducible, inspectable workflows over opaque demos.",
+        for removed in (
+            "# Hi, I'm Alex / ASEnough 👋",
+            "AI Coding",
+            "AI_Agents",
+            "## About me",
+            "## Neon Contribution City",
+            "## Contribution Snake",
         ):
-            self.assertIn(fact, text)
+            self.assertNotIn(removed, text)
 
-    def test_static_technology_badges_are_present(self) -> None:
+    def test_four_technology_badges_and_three_star_badges_are_present(self) -> None:
         text = self.read_readme()
-        expected_labels = (
+        for label in (
             "TypeScript-3178C6",
             "Python-3776AB",
             "Node.js-339933",
             "GitHub_Actions-2088FF",
-            "AI_Agents-8B5CF6",
-        )
-        self.assertEqual(text.count("https://img.shields.io/badge/"), 5)
-        for label in expected_labels:
+        ):
             self.assertIn(f"https://img.shields.io/badge/{label}", text)
+        self.assertEqual(text.count("https://img.shields.io/github/stars/"), 3)
+        for repository in ("planarian", "ForkNeo", "api-image-neo"):
+            self.assertIn(
+                f"https://img.shields.io/github/stars/alexliluz/{repository}",
+                text,
+            )
 
-    def test_featured_work_is_one_compact_line_with_three_owned_projects(
-        self,
-    ) -> None:
+    def test_featured_work_keeps_three_owned_projects_with_star_badges(self) -> None:
         text = self.read_readme()
         repo_names = re.findall(
             r"https://github\.com/alexliluz/([A-Za-z0-9_.-]+)", text
         )
         self.assertEqual(repo_names, ["planarian", "ForkNeo", "api-image-neo"])
-        self.assertIn(
-            "[Planarian](https://github.com/alexliluz/planarian) · "
-            "[ForkNeo](https://github.com/alexliluz/ForkNeo) · "
-            "[api-image-neo](https://github.com/alexliluz/api-image-neo)",
-            text,
-        )
+        for label, repository in (
+            ("Planarian", "planarian"),
+            ("ForkNeo", "ForkNeo"),
+            ("api-image-neo", "api-image-neo"),
+        ):
+            self.assertIn(
+                f"[{label}](https://github.com/alexliluz/{repository})",
+                text,
+            )
+            self.assertIn(
+                f"https://img.shields.io/github/stars/alexliluz/{repository}",
+                text,
+            )
         for removed_copy in (
             "Reproducible UI reconstruction workflows for coding agents.",
             "Safe fork-to-independent repository migration without losing history.",
@@ -112,29 +130,27 @@ class ProfileContractTests(unittest.TestCase):
             text,
         )
 
-    def test_v3_dynamic_assets_are_theme_aware_and_repository_owned(self) -> None:
+    def test_contribution_signal_is_single_theme_and_motion_aware_picture(
+        self,
+    ) -> None:
         text = self.read_readme()
-        self.assertEqual(text.count("<picture>"), 2)
-        self.assertEqual(text.count("</picture>"), 2)
-        for asset in GENERATED_ASSETS:
+        self.assertEqual(text.count("<picture>"), 1)
+        self.assertEqual(text.count("</picture>"), 1)
+        for asset in SIGNAL_ASSETS:
             self.assertIn(f"{GENERATED_ASSET_BASE}{asset}", text)
-        generated_sources = re.findall(
-            rf'(?:src|srcset)=["\']({re.escape(GENERATED_ASSET_BASE)}[^"\']+)["\']',
+        self.assertIn(
+            'media="(prefers-reduced-motion: reduce) and '
+            '(prefers-color-scheme: dark)"',
             text,
         )
-        self.assertEqual(len(generated_sources), 6)
-        for source in generated_sources:
-            self.assertTrue(source.startswith(GENERATED_ASSET_BASE), source)
-        self.assertRegex(
+        self.assertIn(
+            'media="(prefers-reduced-motion: reduce) and '
+            '(prefers-color-scheme: light)"',
             text,
-            r'<source media="\(prefers-color-scheme: dark\)"[^>]+>',
         )
-        self.assertRegex(
-            text,
-            r'<source media="\(prefers-color-scheme: light\)"[^>]+>',
-        )
-        self.assertIn('alt="3D contribution city generated', text)
-        self.assertIn('alt="Animated contribution snake traversing', text)
+        self.assertIn('media="(prefers-color-scheme: dark)"', text)
+        self.assertIn('media="(prefers-color-scheme: light)"', text)
+        self.assertIn('alt="Alex contribution signal:', text)
 
     def test_readme_avoids_unapproved_widgets_and_placeholders(self) -> None:
         text = self.read_readme()
@@ -159,10 +175,12 @@ class ProfileContractTests(unittest.TestCase):
         self.assertNotIn("linuxdo-scripts-neo", text)
         self.assertNotIn("## Connect", text)
 
-    def test_local_hero_is_retained_but_not_rendered(self) -> None:
+    def test_old_hero_is_retained_but_signature_is_rendered(self) -> None:
         text = self.read_readme()
         self.assertTrue(HERO.is_file())
+        self.assertTrue(SIGNATURE.is_file())
         self.assertNotIn("./assets/profile-hero.svg", text)
+        self.assertIn("./assets/alex-signature.svg", text)
 
     def test_svg_is_accessible_responsive_animated_and_theme_aware(self) -> None:
         self.assertTrue(HERO.is_file(), "assets/profile-hero.svg must exist")
@@ -215,7 +233,19 @@ class ProfileContractTests(unittest.TestCase):
             "git -C .tmp/output-branch push origin HEAD:output",
         ):
             self.assertIn(fragment, source)
+        for fragment in (
+            "scripts/profile_star_history.py",
+            "scripts/compose_contribution_signal.py",
+            "star-history.json",
+            "contribution-signal-light.svg",
+            "contribution-signal-dark.svg",
+            "contribution-signal-light-static.svg",
+            "contribution-signal-dark-static.svg",
+            "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+        ):
+            self.assertIn(fragment, source)
         self.assertNotIn("secrets.PAT", source)
+        self.assertNotIn("PROFILE_STATS_TOKEN", source)
         self.assertNotIn("|| exit 0", source)
         action_refs = re.findall(r"uses:\s+[^\s]+@([^\s#]+)", source)
         self.assertEqual(len(action_refs), 3)
