@@ -6,19 +6,51 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from scripts.profile_star_history import load_history
-from scripts.validate_profile_assets import (
-    MAX_SVG_BYTES,
-    local_name,
-    validate_svg,
-    validate_svg_source,
-)
+if __package__:
+    from scripts.profile_star_history import load_history
+    from scripts.validate_profile_assets import (
+        MAX_SVG_BYTES,
+        decode_css_escapes,
+        local_name,
+        validate_svg,
+        validate_svg_source,
+    )
+else:
+    from profile_star_history import load_history
+    from validate_profile_assets import (
+        MAX_SVG_BYTES,
+        decode_css_escapes,
+        local_name,
+        validate_svg,
+        validate_svg_source,
+    )
 
 
 MAX_BYTES = MAX_SVG_BYTES
-SMIL_LOCAL_NAMES = {"animate", "animatemotion", "animatetransform", "set"}
-CSS_ANIMATION_DECLARATION_PATTERN = re.compile(
-    r"(^|[;{])\s*animation(?:-[a-z-]+)?\s*:\s*[^;{}]*(?:;|(?=}|$))",
+SMIL_LOCAL_NAMES = {
+    "animate",
+    "animatecolor",
+    "animatemotion",
+    "animatetransform",
+    "set",
+}
+CSS_IDENTIFIER_ESCAPE = (
+    r"\\(?:[0-9a-f]{1,6}(?:\r\n|[ \t\r\n\f])?|[^\r\n\f])"
+)
+CSS_COMMENT = r"/\*(?:[^*]|\*(?!/))*\*/"
+CSS_IGNORABLE = r"(?:\s|" + CSS_COMMENT + r")*"
+CSS_DECLARATION_PATTERN = re.compile(
+    r"(?P<prefix>^|[;{])"
+    + CSS_IGNORABLE
+    + r"(?P<property>(?:"
+    + CSS_IDENTIFIER_ESCAPE
+    + r"|[-_a-z0-9])+)"
+    + CSS_IGNORABLE
+    + r":\s*[^;{}]*(?=;|}|$)",
+    re.IGNORECASE,
+)
+CSS_MOTION_PROPERTY_PATTERN = re.compile(
+    r"(?:-[a-z]+-)?(?:animation|transition)(?:-[a-z-]+)?",
     re.IGNORECASE,
 )
 
@@ -30,6 +62,7 @@ THEMES = {
         "primary": "#24292F",
         "muted": "#57606A",
         "trend": "#CF222E",
+        "star": "#9A6700",
     },
     "dark": {
         "background": "#080B12",
@@ -37,6 +70,7 @@ THEMES = {
         "primary": "#E6EDF3",
         "muted": "#8B949E",
         "trend": "#FF4F79",
+        "star": "#E3B341",
     },
 }
 
@@ -50,8 +84,19 @@ def read_safe_svg(path: Path) -> str:
     return source
 
 
-def strip_css_animation_declarations(css: str) -> str:
-    return CSS_ANIMATION_DECLARATION_PATTERN.sub(r"\1", css)
+def strip_css_motion_declarations(css: str) -> str:
+    def remove_motion(match: re.Match) -> str:
+        property_name = decode_css_escapes(match.group("property"))
+        if CSS_MOTION_PROPERTY_PATTERN.fullmatch(property_name):
+            prefix = match.group("prefix")
+            return prefix if prefix == "{" else ""
+        return match.group(0)
+
+    while True:
+        static = CSS_DECLARATION_PATTERN.sub(remove_motion, css)
+        if static == css:
+            return static
+        css = static
 
 
 def static_source(source: str) -> str:
@@ -62,9 +107,9 @@ def static_source(source: str) -> str:
                 parent.remove(child)
     for element in root.iter():
         if local_name(element.tag) == "style":
-            element.text = strip_css_animation_declarations(element.text or "")
+            element.text = strip_css_motion_declarations(element.text or "")
         if "style" in element.attrib:
-            element.attrib["style"] = strip_css_animation_declarations(
+            element.attrib["style"] = strip_css_motion_declarations(
                 element.attrib["style"]
             )
     static = ET.tostring(root, encoding="unicode")
@@ -117,14 +162,14 @@ def compose(
     """
     source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 660" role="img" aria-labelledby="title description">
   <title id="title">Alex contribution signal</title>
-  <desc id="description">Star trend, 3D contribution city, and original animated contribution-grid snake.</desc>
+  <desc id="description">Star trend, 3D contribution city, and original contribution-grid snake.</desc>
   <style>{animation_style}</style>
   <rect x="1" y="1" width="958" height="658" rx="18" fill="{theme['background']}" stroke="{theme['border']}" stroke-width="2"/>
   <text x="28" y="38" fill="{theme['primary']}" font-family="ui-monospace, monospace" font-size="15" font-weight="600" letter-spacing="3">CONTRIBUTION SIGNAL</text>
   <text x="28" y="58" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="10" letter-spacing="1">PUBLIC ACTIVITY · DAILY</text>
   <rect x="680" y="18" width="252" height="70" rx="10" fill="{theme['background']}" stroke="{theme['border']}"/>
   <text x="696" y="37" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">STAR TREND</text>
-  <text x="910" y="37" text-anchor="end" fill="#E3B341" font-family="ui-monospace, monospace" font-size="12">★ {total}</text>
+  <text x="910" y="37" text-anchor="end" fill="{theme['star']}" font-family="ui-monospace, monospace" font-size="12">★ {total}</text>
   <polyline class="trend" points="{points}" fill="none" stroke="{theme['trend']}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="696" y="82" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="8">SNAPSHOTS FROM {html.escape(start_date)}</text>
   <text x="28" y="104" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">3D CONTRIBUTION CITY</text>

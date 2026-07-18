@@ -23,7 +23,7 @@ TypeScript / Python developer focused on developer tooling, CLI automation, and 
   <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light-static.svg">
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light.svg">
-  <img src="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light.svg" alt="Alex contribution signal: Star trend, 3D contribution city, and original animated contribution-grid snake" width="100%">
+  <img src="https://raw.githubusercontent.com/alexliluz/alexliluz/output/contribution-signal-light.svg" alt="Alex contribution signal: Star trend, 3D contribution city, and original contribution-grid snake" width="100%">
 </picture>
 
 ---

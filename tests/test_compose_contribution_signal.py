@@ -1,17 +1,29 @@
 import base64
 import json
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from scripts.compose_contribution_signal import MAX_BYTES, compose, compose_all
+from scripts.compose_contribution_signal import (
+    MAX_BYTES,
+    compose,
+    compose_all,
+    static_source,
+)
 
 
 SVG = "http://www.w3.org/2000/svg"
-SMIL_NAMES = {"animate", "animatemotion", "animatetransform", "set"}
-CSS_ANIMATION = re.compile(r"animation(?:-[a-z-]+)?\s*:", re.IGNORECASE)
+SMIL_NAMES = {"animate", "animatecolor", "animatemotion", "animatetransform", "set"}
+CSS_MOTION = re.compile(
+    r"(?:-[a-z]+-)?(?:animation|transition)(?:-[a-z-]+)?\s*:",
+    re.IGNORECASE,
+)
+ROOT = Path(__file__).resolve().parents[1]
+COMPOSER = ROOT / "scripts" / "compose_contribution_signal.py"
 
 
 def local_name(name: str) -> str:
@@ -64,8 +76,29 @@ class ContributionSignalComposerTests(unittest.TestCase):
         for element in root.iter():
             self.assertNotIn(local_name(element.tag), SMIL_NAMES)
             if local_name(element.tag) == "style":
-                self.assertNotRegex(element.text or "", CSS_ANIMATION)
-            self.assertNotRegex(element.attrib.get("style", ""), CSS_ANIMATION)
+                self.assertNotRegex(element.text or "", CSS_MOTION)
+            self.assertNotRegex(element.attrib.get("style", ""), CSS_MOTION)
+
+    def contrast_ratio(self, first: str, second: str) -> float:
+        def luminance(color: str) -> float:
+            channels = [int(color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+            linear = [
+                channel / 12.92
+                if channel <= 0.04045
+                else ((channel + 0.055) / 1.055) ** 2.4
+                for channel in channels
+            ]
+            return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+        lighter, darker = sorted((luminance(first), luminance(second)), reverse=True)
+        return (lighter + 0.05) / (darker + 0.05)
+
+    def sample_history(self) -> dict:
+        return {
+            "snapshots": [
+                {"date": "2026-07-19", "repos": {"planarian": 1}},
+            ]
+        }
 
     def test_composes_byte_preserving_animated_and_valid_static_theme_variants(self) -> None:
         with tempfile.TemporaryDirectory() as directory_name:
@@ -110,7 +143,162 @@ class ContributionSignalComposerTests(unittest.TestCase):
                         self.assertEqual(payloads, list(expected_payloads))
                         for payload in payloads:
                             self.assertIn("<animate", payload)
-                            self.assertRegex(payload, CSS_ANIMATION)
+                            self.assertRegex(payload, CSS_MOTION)
+
+    def test_star_total_meets_text_contrast_for_each_theme(self) -> None:
+        minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
+        fills = {}
+        for theme_name in ("light", "dark"):
+            with self.subTest(theme=theme_name):
+                root = ET.fromstring(
+                    compose(
+                        minimal_svg,
+                        minimal_svg,
+                        self.sample_history(),
+                        theme_name,
+                        False,
+                    )
+                )
+                background = next(
+                    element.attrib["fill"]
+                    for element in root
+                    if local_name(element.tag) == "rect"
+                )
+                star = next(
+                    element
+                    for element in root
+                    if local_name(element.tag) == "text"
+                    and (element.text or "").startswith("★")
+                )
+                fills[theme_name] = star.attrib["fill"]
+                self.assertGreaterEqual(
+                    self.contrast_ratio(star.attrib["fill"], background),
+                    4.5,
+                )
+        self.assertEqual(fills["dark"], "#E3B341")
+        self.assertNotEqual(fills["light"], fills["dark"])
+
+    def test_generated_description_is_motion_neutral_for_all_variants(self) -> None:
+        minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
+        for static in (False, True):
+            with self.subTest(static=static):
+                root = ET.fromstring(
+                    compose(
+                        minimal_svg,
+                        minimal_svg,
+                        self.sample_history(),
+                        "light",
+                        static,
+                    )
+                )
+                description = root.find(f"{{{SVG}}}desc")
+                self.assertEqual(
+                    description.text,
+                    "Star trend, 3D contribution city, and original "
+                    "contribution-grid snake.",
+                )
+
+    def test_staticization_removes_animate_color(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}"><rect fill="red">'
+            '<animateColor attributeName="fill" values="red;blue" dur="1s"/>'
+            "</rect></svg>"
+        )
+        static = static_source(source)
+        self.assert_static_payload(static)
+        ET.fromstring(static)
+
+    def test_staticization_removes_vendor_prefixed_animation_declarations(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}">'
+            "<style>.moving{-webkit-animation:pulse 1s;fill:red}</style>"
+            '<rect class="moving" style="-moz-animation-delay:1s;stroke:blue"/>'
+            "</svg>"
+        )
+        static = static_source(source)
+        self.assert_static_payload(static)
+        self.assertIn("fill:red", static)
+        self.assertIn("stroke:blue", static)
+        ET.fromstring(static)
+
+    def test_staticization_removes_transition_declarations(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}">'
+            "<style>.moving{transition:transform 1s;fill:red}</style>"
+            '<rect class="moving" style="-webkit-transition-delay:1s;stroke:blue"/>'
+            "</svg>"
+        )
+        static = static_source(source)
+        self.assert_static_payload(static)
+        self.assertIn("fill:red", static)
+        self.assertIn("stroke:blue", static)
+        ET.fromstring(static)
+
+    def test_staticization_removes_consecutive_motion_declarations(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}"><style>.moving{{'
+            "-webkit-animation:pulse 1s;transition:transform 1s;fill:red}"
+            "</style></svg>"
+        )
+        static = static_source(source)
+        self.assert_static_payload(static)
+        self.assertIn("fill:red", static)
+        ET.fromstring(static)
+
+    def test_staticization_removes_css_escaped_motion_declarations(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}"><style>.moving{{'
+            "\\61nimation:pulse 1s;tr\\61nsition:transform 1s;fill:red}"
+            "</style></svg>"
+        )
+        static = static_source(source)
+        self.assertNotIn(r"\61nimation", static)
+        self.assertNotIn(r"tr\61nsition", static)
+        self.assertIn("fill:red", static)
+        ET.fromstring(static)
+
+    def test_staticization_removes_motion_after_nonmotion_declaration(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}"><style>'
+            ".moving{fill:red;animation-name:pulse}"
+            "</style></svg>"
+        )
+        static = static_source(source)
+        self.assert_static_payload(static)
+        self.assertIn("fill:red", static)
+        ET.fromstring(static)
+
+    def test_staticization_removes_comment_delimited_motion_declarations(
+        self,
+    ) -> None:
+        source = (
+            f'<svg xmlns="{SVG}"><style>.moving{{'
+            "animation/**/:pulse 1s;fill:red;transition/**/:transform 1s}"
+            "</style></svg>"
+        )
+        static = static_source(source)
+        self.assertNotIn("animation/**/", static)
+        self.assertNotIn("transition/**/", static)
+        self.assert_static_payload(static)
+        self.assertIn("fill:red", static)
+        ET.fromstring(static)
+
+    def test_help_succeeds_for_module_and_direct_script_entry_points(self) -> None:
+        commands = (
+            [sys.executable, "-m", "scripts.compose_contribution_signal", "--help"],
+            [sys.executable, str(COMPOSER), "--help"],
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    command,
+                    cwd=ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("usage:", result.stdout)
 
     def test_rejects_script_and_remote_runtime_references_in_inputs(self) -> None:
         fixtures = (

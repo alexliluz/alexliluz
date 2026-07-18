@@ -183,7 +183,7 @@ class ProfileContractTests(unittest.TestCase):
                 (
                     f"{GENERATED_ASSET_BASE}contribution-signal-light.svg",
                     "Alex contribution signal: Star trend, 3D contribution city, "
-                    "and original animated contribution-grid snake",
+                    "and original contribution-grid snake",
                 )
             ],
         )
@@ -266,6 +266,45 @@ class ProfileContractTests(unittest.TestCase):
             )
             self.assertIsNotNone(match, line)
             return match.start()
+
+        def output_branch_case_arms(block: str) -> tuple[str, str, str]:
+            status_init = "output_branch_status=0"
+            probe = (
+                "git ls-remote --exit-code --heads origin refs/heads/output "
+                ">/dev/null 2>&1 || output_branch_status=$?"
+            )
+            case_start = 'case "$output_branch_status" in'
+            self.assertEqual(block.count(status_init), 1)
+            self.assertEqual(block.count(probe), 1)
+            self.assertEqual(block.count(case_start), 1)
+            self.assertEqual(
+                [
+                    line_position(block, status_init),
+                    line_position(block, probe),
+                    line_position(block, case_start),
+                ],
+                sorted(
+                    (
+                        line_position(block, status_init),
+                        line_position(block, probe),
+                        line_position(block, case_start),
+                    )
+                ),
+            )
+            match = re.search(
+                r'(?ms)^[ \t]*case "\$output_branch_status" in[ \t]*\n'
+                r'[ \t]*0\)[ \t]*\n(?P<exists>.*?)^[ \t]*;;[ \t]*\n'
+                r'[ \t]*2\)[ \t]*\n(?P<absent>.*?)^[ \t]*;;[ \t]*\n'
+                r'[ \t]*\*\)[ \t]*\n(?P<failure>.*?)^[ \t]*;;[ \t]*\n'
+                r'[ \t]*esac[ \t]*$',
+                block,
+            )
+            self.assertIsNotNone(match, "expected explicit 0/2/other status handling")
+            return (
+                match.group("exists"),
+                match.group("absent"),
+                match.group("failure"),
+            )
 
         for fragment in (
             "schedule:",
@@ -393,9 +432,10 @@ class ProfileContractTests(unittest.TestCase):
         )
 
         restore = step_block("Restore previous Star snapshots")
+        restore_exists, restore_absent, restore_failure = output_branch_case_arms(
+            restore
+        )
         restore_commands = (
-            "if git ls-remote --exit-code --heads origin output "
-            ">/dev/null 2>&1; then",
             "git fetch origin output",
             "if git cat-file -e origin/output:star-history.json "
             "2>/dev/null; then",
@@ -411,20 +451,35 @@ class ProfileContractTests(unittest.TestCase):
             restore.count("origin/output:star-history.json"),
             2,
         )
+        for command in restore_commands:
+            self.assertIn(command, restore_exists)
+        self.assertEqual(restore_absent.strip(), "")
+        self.assertIn('exit "$output_branch_status"', restore_failure)
+        self.assertNotIn("git fetch", restore_failure)
 
         publication = step_block("Publish output branch atomically")
         self.assertEqual(
             source.count(f"{step_prefix}Publish output branch atomically\n"),
             1,
         )
-        publication_guard = (
-            "if git ls-remote --exit-code --heads origin output "
-            ">/dev/null 2>&1; then"
+        publication_exists, publication_absent, publication_failure = (
+            output_branch_case_arms(publication)
         )
-        self.assertLess(
-            line_position(publication, publication_guard),
-            line_position(publication, "git fetch origin output"),
+        self.assertIn("git fetch origin output", publication_exists)
+        self.assertIn(
+            "git worktree add --detach .tmp/output-branch origin/output",
+            publication_exists,
         )
+        self.assertIn(
+            "git worktree add --detach .tmp/output-branch",
+            publication_absent,
+        )
+        self.assertIn(
+            "git -C .tmp/output-branch checkout --orphan output",
+            publication_absent,
+        )
+        self.assertIn('exit "$output_branch_status"', publication_failure)
+        self.assertNotIn("git worktree add", publication_failure)
         self.assertEqual(
             re.findall(
                 r"(?m)^[ \t]*cp \.tmp/profile-output/"

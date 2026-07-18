@@ -1,3 +1,4 @@
+import base64
 import subprocess
 import tempfile
 import unittest
@@ -154,6 +155,142 @@ class GeneratedSvgValidatorTests(unittest.TestCase):
                 validate_svg(equal_limit)
             with self.assertRaisesRegex(ValueError, "2 MiB"):
                 validate_svg_source(equal_limit.read_text(encoding="utf-8"))
+
+    def test_accepts_fragment_and_approved_embedded_svg_references(self) -> None:
+        embedded = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<defs><path id="embedded" d="M0 0"/></defs>'
+            '<use href="#embedded"/></svg>'
+        )
+        encoded = base64.b64encode(embedded.encode("utf-8")).decode("ascii")
+        source = (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink">'
+            '<defs><linearGradient id="paint"/></defs>'
+            '<rect id="local" fill="url(#paint)"/>'
+            '<use href="#local"/>'
+            '<use xlink:href="#local"/>'
+            '<set attributeName="href" to="#local"/>'
+            f'<image href="data:image/svg+xml;base64,{encoded}"/>'
+            "</svg>"
+        )
+        self.assertIsNotNone(validate_svg_source(source))
+
+    def test_rejects_relative_runtime_resource_references(self) -> None:
+        fixtures = (
+            '<image href="image.svg"/>',
+            '<use href="sprite.svg#icon"/>',
+            '<image src="./image.svg"/>',
+            '<object data="../asset.svg"/>',
+            '<use xmlns:xlink="http://www.w3.org/1999/xlink" '
+            'xlink:href="icons.svg#icon"/>',
+            '<rect fill="url(patterns.svg#paint)"/>',
+            '<style>.x{mask:url(../masks.svg#mask)}</style>',
+            '<style>@import "theme.css";</style>',
+        )
+        for fixture in fixtures:
+            source = f'<svg xmlns="http://www.w3.org/2000/svg">{fixture}</svg>'
+            with self.subTest(fixture=fixture), self.assertRaisesRegex(
+                ValueError, "runtime reference"
+            ):
+                validate_svg_source(source)
+
+    def test_rejects_nonapproved_data_images_and_all_css_imports(self) -> None:
+        safe_embedded = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        safe_encoded = base64.b64encode(safe_embedded.encode("utf-8")).decode(
+            "ascii"
+        )
+        unsafe_embedded = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<image href="https://example.com/image.svg"/></svg>'
+        )
+        unsafe_encoded = base64.b64encode(unsafe_embedded.encode("utf-8")).decode(
+            "ascii"
+        )
+        fixtures = (
+            '<image href="data:image/png;base64,eA=="/>',
+            f'<a href="data:image/svg+xml;base64,{safe_encoded}"/>',
+            '<style>@import url(#local);</style>',
+            f'<style>@import url(data:image/svg+xml;base64,{safe_encoded});</style>',
+            f'<image href="data:image/svg+xml;base64,{unsafe_encoded}"/>',
+        )
+        for fixture in fixtures:
+            source = (
+                '<svg xmlns="http://www.w3.org/2000/svg">'
+                '<g id="local"/>'
+                f"{fixture}</svg>"
+            )
+            with self.subTest(fixture=fixture), self.assertRaises(ValueError):
+                validate_svg_source(source)
+
+    def test_rejects_smil_uri_rewrites(self) -> None:
+        fixtures = (
+            '<set attributeName="href" to="https://example.com/image.svg"/>',
+            '<set attributeName="href" to="image.svg"/>',
+            '<set attributeName=" href " to="image.svg"/>',
+            '<set attributeName="xlink:href" to="image.svg"/>',
+            '<set attributeName="href" to="javascript:alert(1)"/>',
+            '<set attributeName="href" to="data:image/png;base64,eA=="/>',
+            '<animate attributeName="href" from="#local" '
+            'to="//example.com/image.svg"/>',
+            '<animate attributeName="href" '
+            'values="#local;https://example.com/image.svg"/>',
+            '<animate attributeName="href" '
+            'values="#local;icons.svg#remote"/>',
+            '<animate attributeName="fill" '
+            'values="red;url(https://example.com/paint.svg#paint)"/>',
+            '<animate attributeName="opacity" '
+            'begin="https://example.com/timing.svg#event"/>',
+        )
+        for fixture in fixtures:
+            source = (
+                '<svg xmlns="http://www.w3.org/2000/svg">'
+                '<g id="local"/>'
+                f"{fixture}</svg>"
+            )
+            with self.subTest(fixture=fixture), self.assertRaises(ValueError):
+                validate_svg_source(source)
+
+    def test_rejects_css_escaped_remote_references(self) -> None:
+        fixtures = (
+            r'<style>.x{fill:u\72l(https://example.com/image.svg)}</style>',
+            r'<style>@\69mport "https://example.com/theme.css";</style>',
+        )
+        for fixture in fixtures:
+            source = f'<svg xmlns="http://www.w3.org/2000/svg">{fixture}</svg>'
+            with self.subTest(fixture=fixture), self.assertRaisesRegex(
+                ValueError, "runtime reference"
+            ):
+                validate_svg_source(source)
+
+    def test_rejects_xml_stylesheet_processing_instructions(self) -> None:
+        for stylesheet in ("https://example.com/theme.css", "theme.css"):
+            source = (
+                f'<?xml-stylesheet href="{stylesheet}"?>'
+                '<svg xmlns="http://www.w3.org/2000/svg"/>'
+            )
+            with self.subTest(stylesheet=stylesheet), self.assertRaisesRegex(
+                ValueError, "stylesheet"
+            ):
+                validate_svg_source(source)
+
+    def test_rejects_compound_uri_attributes(self) -> None:
+        fixtures = (
+            '<img xmlns="http://www.w3.org/1999/xhtml" '
+            'srcset="https://example.com/image.png 1x"/>',
+            '<img xmlns="http://www.w3.org/1999/xhtml" srcset="image.png 1x"/>',
+            '<link xmlns="http://www.w3.org/1999/xhtml" '
+            'imagesrcset="image.png 1x"/>',
+        )
+        for fixture in fixtures:
+            source = (
+                '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject>'
+                f"{fixture}</foreignObject></svg>"
+            )
+            with self.subTest(fixture=fixture), self.assertRaisesRegex(
+                ValueError, "runtime reference"
+            ):
+                validate_svg_source(source)
 
     def test_cli_reports_the_invalid_path_and_returns_nonzero(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

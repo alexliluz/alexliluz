@@ -49,12 +49,22 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .tmp/previous-star-history.json
-          if git ls-remote --exit-code --heads origin output >/dev/null 2>&1; then
-            git fetch origin output
-            if git cat-file -e origin/output:star-history.json 2>/dev/null; then
-              git show origin/output:star-history.json > .tmp/previous-star-history.json
-            fi
-          fi
+          output_branch_status=0
+          git ls-remote --exit-code --heads origin refs/heads/output >/dev/null 2>&1 || output_branch_status=$?
+          case "$output_branch_status" in
+            0)
+              git fetch origin output
+              if git cat-file -e origin/output:star-history.json 2>/dev/null; then
+                git show origin/output:star-history.json > .tmp/previous-star-history.json
+              fi
+              ;;
+            2)
+              ;;
+            *)
+              echo "::error::Failed to query output branch (git ls-remote exited $output_branch_status)" >&2
+              exit "$output_branch_status"
+              ;;
+          esac
 
       - name: Record current Star counts
         env:
@@ -87,15 +97,24 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf .tmp/output-branch
-          if git ls-remote --exit-code --heads origin output >/dev/null 2>&1; then
-            git fetch origin output
-            git worktree add --detach .tmp/output-branch origin/output
-            git -C .tmp/output-branch rm -rf .
-          else
-            git worktree add --detach .tmp/output-branch
-            git -C .tmp/output-branch checkout --orphan output
-            git -C .tmp/output-branch rm -rf .
-          fi
+          output_branch_status=0
+          git ls-remote --exit-code --heads origin refs/heads/output >/dev/null 2>&1 || output_branch_status=$?
+          case "$output_branch_status" in
+            0)
+              git fetch origin output
+              git worktree add --detach .tmp/output-branch origin/output
+              git -C .tmp/output-branch rm -rf .
+              ;;
+            2)
+              git worktree add --detach .tmp/output-branch
+              git -C .tmp/output-branch checkout --orphan output
+              git -C .tmp/output-branch rm -rf .
+              ;;
+            *)
+              echo "::error::Failed to query output branch (git ls-remote exited $output_branch_status)" >&2
+              exit "$output_branch_status"
+              ;;
+          esac
           cp .tmp/profile-output/*.svg .tmp/output-branch/
           cp .tmp/profile-output/star-history.json .tmp/output-branch/
           touch .tmp/output-branch/.nojekyll
