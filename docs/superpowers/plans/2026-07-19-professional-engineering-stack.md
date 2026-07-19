@@ -16,6 +16,11 @@
 - Do not add Python or any other technology to the Engineering Stack panel.
 - Use an animated route loop between 5.8 and 6.2 seconds; select exactly `6s` in the implementation.
 - Animated panels may move only the route signal, node illumination, and heading scan accent.
+- The heading scan travels left-to-right once per 6-second cycle, hides, and resets instantaneously; it never scans back from right to left.
+- Narrow viewports use a dedicated connected route and signal through the centers of the two-row mobile nodes; desktop keeps the straight route.
+- At 380 px and below, required secondary and technology text grows to 27 SVG units and heading baselines separate so 320/360/375 px renderings remain at least 9 px without clipping or overlap.
+- TypeScript and Node.js are explicit primary nodes with slightly stronger stroke, label, and mark weight.
+- Validate the exact required groups and technology labels before rendering or writing any asset.
 - Static variants must contain no SMIL animation elements and no CSS animation or transition declarations.
 - Generate light, dark, animated, and static assets from one deterministic repository script.
 - Keep all SVG resources self-contained and below the existing 2 MiB asset limit.
@@ -190,6 +195,7 @@ class StackNode:
     x: int
     accent: str
     delay: float
+    primary: bool
 
 
 @dataclass(frozen=True)
@@ -202,18 +208,24 @@ class StackGroup:
 
 STACK_GROUPS = (
     StackGroup("BUILD", 30, 238, (
-        StackNode("TypeScript", "TS", 92, "#3178C6", 0.0),
-        StackNode("Node.js", "JS", 210, "#3C873A", 0.85),
+        StackNode("TypeScript", "TS", 92, "#3178C6", 0.0, True),
+        StackNode("Node.js", "JS", 210, "#3C873A", 0.85, True),
     )),
     StackGroup("AUTOMATE", 282, 266, (
-        StackNode("pnpm", "pn", 350, "#F69220", 1.70),
-        StackNode("GitHub Actions", "GH", 480, "#2088FF", 2.55),
+        StackNode("pnpm", "pn", 350, "#F69220", 1.70, False),
+        StackNode("GitHub Actions", "GH", 480, "#2088FF", 2.55, False),
     )),
     StackGroup("VERIFY", 562, 368, (
-        StackNode("Vitest", "Vi", 624, "#729B1B", 3.40),
-        StackNode("Playwright", "Pw", 752, "#2EAD33", 4.25),
-        StackNode("Git", "Git", 872, "#F05032", 5.10),
+        StackNode("Vitest", "Vi", 624, "#729B1B", 3.40, False),
+        StackNode("Playwright", "Pw", 752, "#2EAD33", 4.25, False),
+        StackNode("Git", "G", 872, "#F05032", 5.10, False),
     )),
+)
+
+REQUIRED_STACK = (
+    ("BUILD", ("TypeScript", "Node.js")),
+    ("AUTOMATE", ("pnpm", "GitHub Actions")),
+    ("VERIFY", ("Vitest", "Playwright", "Git")),
 )
 
 PALETTES = {
@@ -241,8 +253,13 @@ Implement `render_node`, `build_svg`, and `write_assets` with these exact struct
 
 ```python
 def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str:
+    classes = ["stack-node"]
+    if node.primary:
+        classes.append("primary-node")
+    if animated:
+        classes.append("animated-node")
+    class_name = " ".join(classes)
     style = f' style="--delay:{node.delay:.2f}s"' if animated else ""
-    class_name = "stack-node animated-node" if animated else "stack-node"
     return f'''<g class="{class_name}" transform="translate({node.x - 52} 154)"{style}>
       <rect width="104" height="70" rx="14" fill="{palette['panel']}" stroke="{palette['border']}"/>
       <circle cx="20" cy="22" r="10" fill="{node.accent}" fill-opacity=".18"/>
@@ -252,9 +269,11 @@ def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str
 
 
 def build_svg(theme: str, animated: bool) -> str:
+    validate_stack_model(STACK_GROUPS)
     if theme not in PALETTES:
         raise ValueError(f"unsupported theme: {theme}")
     palette = PALETTES[theme]
+    mobile_route = mobile_route_path(STACK_GROUPS)
     groups = "".join(
         f'''<g class="stack-group">
           <rect x="{group.x}" y="118" width="{group.width}" height="130" rx="18" fill="{palette['panel']}" stroke="{palette['border']}"/>
@@ -268,11 +287,15 @@ def build_svg(theme: str, animated: bool) -> str:
       .animated-node { animation:node-signal 6s ease-in-out infinite; animation-delay:var(--delay); }
     '''
     motion = "" if not animated else f'''
-      <circle r="5" fill="{palette['cyan']}" filter="url(#signal-glow)">
-        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route"/></animateMotion>
+      <circle class="route-signal desktop-only" r="5" fill="{palette['cyan']}" filter="url(#signal-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route-desktop"/></animateMotion>
+      </circle>
+      <circle class="route-signal mobile-only" r="5" fill="{palette['cyan']}" filter="url(#signal-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route-mobile"/></animateMotion>
       </circle>
       <rect x="30" y="91" width="120" height="2" rx="1" fill="{palette['coral']}" opacity=".85">
-        <animate attributeName="x" values="30;810;30" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="x" values="30;810;810;30" keyTimes="0;.72;.999;1" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".85;.85;0;0" keyTimes="0;.72;.721;1" dur="6s" repeatCount="indefinite"/>
       </rect>'''
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-labelledby="engineering-stack-title engineering-stack-description">
   <title id="engineering-stack-title">Alex engineering stack</title>
@@ -291,13 +314,15 @@ def build_svg(theme: str, animated: bool) -> str:
   <rect x="1" y="1" width="958" height="298" rx="22" fill="{palette['surface']}" stroke="{palette['border']}" stroke-width="2"/>
   <text x="30" y="48" class="title">ENGINEERING STACK</text>
   <text x="30" y="75" class="subtitle">PUBLIC TOOLCHAIN · VERIFIED BY WORK</text>
-  <path id="engineering-route" d="M92 188 H872" fill="none" stroke="{palette['route']}" stroke-width="2"/>
+  <path id="engineering-route-desktop" class="engineering-route desktop-only" d="M92 188 H872" fill="none" stroke="{palette['route']}" stroke-width="2"/>
+  <path id="engineering-route-mobile" class="engineering-route mobile-only" d="{mobile_route}" fill="none" stroke="{palette['route']}" stroke-width="2"/>
   {groups}
   {motion}
 </svg>\n'''
 
 
 def write_assets(output_dir: Path) -> tuple[Path, ...]:
+    validate_stack_model(STACK_GROUPS)
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     for filename, theme, animated in OUTPUTS:

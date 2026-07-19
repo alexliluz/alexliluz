@@ -12,6 +12,7 @@ class StackNode:
     x: int
     accent: str
     delay: float
+    primary: bool
 
 
 @dataclass(frozen=True)
@@ -24,18 +25,24 @@ class StackGroup:
 
 STACK_GROUPS = (
     StackGroup("BUILD", 30, 238, (
-        StackNode("TypeScript", "TS", 92, "#3178C6", 0.0),
-        StackNode("Node.js", "JS", 210, "#3C873A", 0.85),
+        StackNode("TypeScript", "TS", 92, "#3178C6", 0.0, True),
+        StackNode("Node.js", "JS", 210, "#3C873A", 0.85, True),
     )),
     StackGroup("AUTOMATE", 282, 266, (
-        StackNode("pnpm", "pn", 350, "#F69220", 1.70),
-        StackNode("GitHub Actions", "GH", 480, "#2088FF", 2.55),
+        StackNode("pnpm", "pn", 350, "#F69220", 1.70, False),
+        StackNode("GitHub Actions", "GH", 480, "#2088FF", 2.55, False),
     )),
     StackGroup("VERIFY", 562, 368, (
-        StackNode("Vitest", "Vi", 624, "#729B1B", 3.40),
-        StackNode("Playwright", "Pw", 752, "#2EAD33", 4.25),
-        StackNode("Git", "G", 872, "#F05032", 5.10),
+        StackNode("Vitest", "Vi", 624, "#729B1B", 3.40, False),
+        StackNode("Playwright", "Pw", 752, "#2EAD33", 4.25, False),
+        StackNode("Git", "G", 872, "#F05032", 5.10, False),
     )),
+)
+
+REQUIRED_STACK = (
+    ("BUILD", ("TypeScript", "Node.js")),
+    ("AUTOMATE", ("pnpm", "GitHub Actions")),
+    ("VERIFY", ("Vitest", "Playwright", "Git")),
 )
 
 PALETTES = {
@@ -69,6 +76,73 @@ MOBILE_NODE_POSITIONS = {
 }
 
 
+def _duplicates(values: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(value for value in values if values.count(value) > 1))
+
+
+def _raise_model_error(message: str, values: tuple[str, ...]) -> None:
+    if values:
+        raise ValueError(f"{message}: {', '.join(values)}")
+
+
+def validate_stack_model(groups: tuple[StackGroup, ...]) -> None:
+    required_group_names = tuple(name for name, _ in REQUIRED_STACK)
+    group_names = tuple(group.name for group in groups)
+    _raise_model_error("duplicate stack group", _duplicates(group_names))
+    _raise_model_error(
+        "missing required stack group",
+        tuple(name for name in required_group_names if name not in group_names),
+    )
+    _raise_model_error(
+        "unexpected stack group",
+        tuple(name for name in group_names if name not in required_group_names),
+    )
+    if group_names != required_group_names:
+        raise ValueError(
+            "stack group order must be exactly: " + ", ".join(required_group_names)
+        )
+
+    required_labels = tuple(
+        label for _, labels in REQUIRED_STACK for label in labels
+    )
+    labels = tuple(node.label for group in groups for node in group.nodes)
+    _raise_model_error("duplicate technology label", _duplicates(labels))
+    _raise_model_error(
+        "missing required technology label",
+        tuple(label for label in required_labels if label not in labels),
+    )
+    _raise_model_error(
+        "unexpected technology label",
+        tuple(label for label in labels if label not in required_labels),
+    )
+
+    for group, (required_name, required_group_labels) in zip(groups, REQUIRED_STACK):
+        group_labels = tuple(node.label for node in group.nodes)
+        if group_labels != required_group_labels:
+            raise ValueError(
+                f"{required_name} technologies must be exactly: "
+                + ", ".join(required_group_labels)
+            )
+
+    primary_labels = tuple(
+        node.label for group in groups for node in group.nodes if node.primary
+    )
+    if primary_labels != ("TypeScript", "Node.js"):
+        raise ValueError("primary technologies must be exactly: TypeScript, Node.js")
+
+
+def mobile_route_path(groups: tuple[StackGroup, ...]) -> str:
+    points = tuple(
+        (
+            MOBILE_NODE_POSITIONS[node.label][0] + 109,
+            MOBILE_NODE_POSITIONS[node.label][1] + 35,
+        )
+        for group in groups
+        for node in group.nodes
+    )
+    return "M" + " L".join(f"{x} {y}" for x, y in points)
+
+
 def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str:
     mobile_x, mobile_y = MOBILE_NODE_POSITIONS[node.label]
     style_declarations = [
@@ -78,7 +152,12 @@ def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str
     if animated:
         style_declarations.append(f"--delay:{node.delay:.2f}s")
     style = f' style="{";".join(style_declarations)}"'
-    class_name = "stack-node animated-node" if animated else "stack-node"
+    classes = ["stack-node"]
+    if node.primary:
+        classes.append("primary-node")
+    if animated:
+        classes.append("animated-node")
+    class_name = " ".join(classes)
     return f'''<g class="{class_name}" transform="translate({node.x - 52} 154)"{style}>
       <rect width="104" height="70" rx="14" fill="{palette['panel']}" stroke="{palette['border']}"/>
       <circle cx="20" cy="22" r="10" fill="{node.accent}" fill-opacity=".18"/>
@@ -88,9 +167,11 @@ def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str
 
 
 def build_svg(theme: str, animated: bool) -> str:
+    validate_stack_model(STACK_GROUPS)
     if theme not in PALETTES:
         raise ValueError(f"unsupported theme: {theme}")
     palette = PALETTES[theme]
+    mobile_route = mobile_route_path(STACK_GROUPS)
     groups = "".join(
         f'''<g class="stack-group">
           <rect x="{group.x}" y="118" width="{group.width}" height="130" rx="18" fill="{palette['panel']}" stroke="{palette['border']}"/>
@@ -104,11 +185,15 @@ def build_svg(theme: str, animated: bool) -> str:
       .animated-node { animation:node-signal 6s ease-in-out infinite; animation-delay:var(--delay); }
     '''
     motion = "" if not animated else f'''
-      <circle r="5" fill="{palette['cyan']}" filter="url(#signal-glow)">
-        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route"/></animateMotion>
+      <circle class="route-signal desktop-only" r="5" fill="{palette['cyan']}" filter="url(#signal-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route-desktop"/></animateMotion>
+      </circle>
+      <circle class="route-signal mobile-only" r="5" fill="{palette['cyan']}" filter="url(#signal-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route-mobile"/></animateMotion>
       </circle>
       <rect x="30" y="91" width="120" height="2" rx="1" fill="{palette['coral']}" opacity=".85">
-        <animate attributeName="x" values="30;810;30" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="x" values="30;810;810;30" keyTimes="0;.72;.999;1" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".85;.85;0;0" keyTimes="0;.72;.721;1" dur="6s" repeatCount="indefinite"/>
       </rect>'''
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-labelledby="engineering-stack-title engineering-stack-description">
   <title id="engineering-stack-title">Alex engineering stack</title>
@@ -121,8 +206,14 @@ def build_svg(theme: str, animated: bool) -> str:
       .title {{ fill:{palette['text']}; font-size:24px; font-weight:700; letter-spacing:4px; }}
       .subtitle,.group-label {{ fill:{palette['muted']}; font-size:12px; font-weight:600; letter-spacing:2px; }}
       .node-label {{ fill:{palette['text']}; font-size:12px; font-weight:600; }}
+      .primary-node > rect {{ stroke-width:2; }}
+      .primary-node > .node-label {{ font-weight:700; }}
+      .primary-node > text:first-of-type {{ font-weight:800; }}
+      .mobile-only {{ display:none; }}
       {motion_css}
       @media (max-width: 480px) {{
+        .desktop-only {{ display:none; }}
+        .mobile-only {{ display:inline; }}
         .title {{ font-size:28px; letter-spacing:2px; }}
         .subtitle {{ font-size:21px; letter-spacing:1px; }}
         .group-label {{ font-size:21px; letter-spacing:1px; }}
@@ -138,18 +229,25 @@ def build_svg(theme: str, animated: bool) -> str:
         .stack-node > text:first-of-type {{ font-size:16px; }}
         .stack-node > .node-label {{ x:122px; }}
       }}
+      @media (max-width: 380px) {{
+        .title {{ y:42px; }}
+        .subtitle {{ y:78px; }}
+        .subtitle,.group-label,.node-label {{ font-size:27px; }}
+      }}
     </style>
   </defs>
   <rect x="1" y="1" width="958" height="298" rx="22" fill="{palette['surface']}" stroke="{palette['border']}" stroke-width="2"/>
   <text x="30" y="48" class="title">ENGINEERING STACK</text>
   <text x="30" y="75" class="subtitle">PUBLIC TOOLCHAIN · VERIFIED BY WORK</text>
-  <path id="engineering-route" d="M92 188 H872" fill="none" stroke="{palette['route']}" stroke-width="2"/>
+  <path id="engineering-route-desktop" class="engineering-route desktop-only" d="M92 188 H872" fill="none" stroke="{palette['route']}" stroke-width="2"/>
+  <path id="engineering-route-mobile" class="engineering-route mobile-only" d="{mobile_route}" fill="none" stroke="{palette['route']}" stroke-width="2"/>
   {groups}
   {motion}
 </svg>\n'''
 
 
 def write_assets(output_dir: Path) -> tuple[Path, ...]:
+    validate_stack_model(STACK_GROUPS)
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     for filename, theme, animated in OUTPUTS:

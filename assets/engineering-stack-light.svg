@@ -9,11 +9,17 @@
       .title { fill:#24292F; font-size:24px; font-weight:700; letter-spacing:4px; }
       .subtitle,.group-label { fill:#57606A; font-size:12px; font-weight:600; letter-spacing:2px; }
       .node-label { fill:#24292F; font-size:12px; font-weight:600; }
+      .primary-node > rect { stroke-width:2; }
+      .primary-node > .node-label { font-weight:700; }
+      .primary-node > text:first-of-type { font-weight:800; }
+      .mobile-only { display:none; }
       
       @keyframes node-signal { 0%,72%,100% { filter:none; } 8%,18% { filter:url(#node-glow); } }
       .animated-node { animation:node-signal 6s ease-in-out infinite; animation-delay:var(--delay); }
     
       @media (max-width: 480px) {
+        .desktop-only { display:none; }
+        .mobile-only { display:inline; }
         .title { font-size:28px; letter-spacing:2px; }
         .subtitle { font-size:21px; letter-spacing:1px; }
         .group-label { font-size:21px; letter-spacing:1px; }
@@ -29,21 +35,27 @@
         .stack-node > text:first-of-type { font-size:16px; }
         .stack-node > .node-label { x:122px; }
       }
+      @media (max-width: 380px) {
+        .title { y:42px; }
+        .subtitle { y:78px; }
+        .subtitle,.group-label,.node-label { font-size:27px; }
+      }
     </style>
   </defs>
   <rect x="1" y="1" width="958" height="298" rx="22" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="2"/>
   <text x="30" y="48" class="title">ENGINEERING STACK</text>
   <text x="30" y="75" class="subtitle">PUBLIC TOOLCHAIN · VERIFIED BY WORK</text>
-  <path id="engineering-route" d="M92 188 H872" fill="none" stroke="#8C959F" stroke-width="2"/>
+  <path id="engineering-route-desktop" class="engineering-route desktop-only" d="M92 188 H872" fill="none" stroke="#8C959F" stroke-width="2"/>
+  <path id="engineering-route-mobile" class="engineering-route mobile-only" d="M125 158 L125 239 L356 158 L356 239 L595 158 L835 158 L715 239" fill="none" stroke="#8C959F" stroke-width="2"/>
   <g class="stack-group">
           <rect x="30" y="118" width="238" height="130" rx="18" fill="#FFFFFF" stroke="#D0D7DE"/>
           <text x="48" y="142" class="group-label">BUILD</text>
-          <g class="stack-node animated-node" transform="translate(40 154)" style="--mobile-x:16px;--mobile-y:123px;--delay:0.00s">
+          <g class="stack-node primary-node animated-node" transform="translate(40 154)" style="--mobile-x:16px;--mobile-y:123px;--delay:0.00s">
       <rect width="104" height="70" rx="14" fill="#FFFFFF" stroke="#D0D7DE"/>
       <circle cx="20" cy="22" r="10" fill="#3178C6" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#3178C6" font-size="10" font-weight="700">TS</text>
       <text x="52" y="52" text-anchor="middle" class="node-label">TypeScript</text>
-    </g><g class="stack-node animated-node" transform="translate(158 154)" style="--mobile-x:16px;--mobile-y:204px;--delay:0.85s">
+    </g><g class="stack-node primary-node animated-node" transform="translate(158 154)" style="--mobile-x:16px;--mobile-y:204px;--delay:0.85s">
       <rect width="104" height="70" rx="14" fill="#FFFFFF" stroke="#D0D7DE"/>
       <circle cx="20" cy="22" r="10" fill="#3C873A" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#3C873A" font-size="10" font-weight="700">JS</text>
@@ -84,10 +96,14 @@
     </g>
         </g>
   
-      <circle r="5" fill="#0969DA" filter="url(#signal-glow)">
-        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route"/></animateMotion>
+      <circle class="route-signal desktop-only" r="5" fill="#0969DA" filter="url(#signal-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route-desktop"/></animateMotion>
+      </circle>
+      <circle class="route-signal mobile-only" r="5" fill="#0969DA" filter="url(#signal-glow)">
+        <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#engineering-route-mobile"/></animateMotion>
       </circle>
       <rect x="30" y="91" width="120" height="2" rx="1" fill="#CF222E" opacity=".85">
-        <animate attributeName="x" values="30;810;30" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="x" values="30;810;810;30" keyTimes="0;.72;.999;1" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".85;.85;0;0" keyTimes="0;.72;.721;1" dur="6s" repeatCount="indefinite"/>
       </rect>
 </svg>
