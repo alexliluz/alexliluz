@@ -3,14 +3,15 @@
 TypeScript / Python developer focused on developer tooling, CLI automation, and reproducible systems.<br>
 主要使用 TypeScript、Python 与 Node.js，专注开发者工具、CLI 自动化和可复现工程工作流。
 
-## Tech stack
+## Engineering Stack
 
-<p>
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js">
-  <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions">
-</p>
+<picture>
+  <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="./assets/engineering-stack-dark-static.svg">
+  <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)" srcset="./assets/engineering-stack-light-static.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/engineering-stack-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/engineering-stack-light.svg">
+  <img src="./assets/engineering-stack-light.svg" alt="Alex engineering stack: TypeScript, Node.js, pnpm, GitHub Actions, Vitest, Playwright, and Git" width="100%">
+</picture>
 
 ## Featured work
 
