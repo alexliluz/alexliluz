@@ -12,7 +12,11 @@ from scripts.compose_contribution_signal import (
     compose,
     compose_all,
     static_source,
+    trend_geometry,
+    tune_city_motion,
+    tune_snake_motion,
 )
+from scripts.svg_namespace import namespace_svg
 
 
 SVG = "http://www.w3.org/2000/svg"
@@ -30,16 +34,27 @@ def local_name(name: str) -> str:
 
 
 class ContributionSignalComposerTests(unittest.TestCase):
+    def valid_animated_svg(self) -> str:
+        return f'''<svg xmlns="{SVG}" viewBox="0 0 1 1">
+          <style>
+            .rb-l1-top{{animation:rb-l1-top 10s linear infinite}}
+            .snake{{animation:path 18500ms linear infinite}}
+            @keyframes rb-l1-top{{0%{{fill:red}}100%{{fill:blue}}}}
+            @keyframes path{{62.69%{{fill:green}}62.71%{{fill:black}}}}
+          </style>
+          <rect class="rb-l1-top"><animate attributeName="height" dur="3s"/></rect>
+        </svg>'''
+
     def write_svg(self, path: Path, marker: str) -> str:
         source = (
             f'<svg xmlns="{SVG}" xmlns:s="{SVG}" viewBox="0 0 100 40">'
-            '<style>.moving{animation:pulse 2s infinite}</style>'
+            '<style>.moving{animation:pulse 2s infinite}.rb-l1-top{animation:rb-l1-top 10s linear infinite}.snake{animation:path 18500ms linear infinite}@keyframes rb-l1-top{0%{fill:red}100%{fill:blue}}@keyframes path{62.69%{fill:green}62.71%{fill:black}}</style>'
             '<g style="animation-delay:0.000s"><text>'
             f'{marker}</text><g class="moving">'
             '<animate attributeName="opacity" values="0;1" dur="2s" '
             'repeatCount="indefinite"/>'
             '<s:animateTransform attributeName="transform" type="rotate" '
-            'from="0" to="360" dur="2s"/></g></g></svg>'
+            'from="0" to="360" dur="2s"/></g><rect class="rb-l1-top"><animate attributeName="height" values="2;10" dur="3s"/></rect></g></svg>'
         )
         path.write_text(source, encoding="utf-8")
         return source
@@ -92,6 +107,46 @@ class ContributionSignalComposerTests(unittest.TestCase):
                 {"date": "2026-07-19", "repos": {"planarian": 1}},
             ]
         }
+
+    def test_motion_uses_approved_durations_and_preserves_snake_percentages(self) -> None:
+        city_source = f'''<svg xmlns="{SVG}">
+          <style>
+            .rb-l1-top{{animation:rb-l1-top 10s linear infinite}}
+            @keyframes rb-l1-top{{0%{{fill:red}}100%{{fill:blue}}}}
+          </style>
+          <rect class="rb-l1-top">
+            <animate attributeName="height" values="2;10" dur="3s"/>
+          </rect>
+        </svg>'''
+        snake_source = f'''<svg xmlns="{SVG}">
+          <style>
+            .c{{animation:none 18500ms linear infinite}}
+            @keyframes path{{62.69%{{fill:green}}62.71%{{fill:black}}}}
+          </style>
+        </svg>'''
+        city = namespace_svg(city_source, "city")
+        snake = namespace_svg(snake_source, "snake")
+        tune_city_motion(city, "dark")
+        tune_snake_motion(snake)
+        city_text = ET.tostring(city, encoding="unicode")
+        snake_text = ET.tostring(snake, encoding="unicode")
+        self.assertIn("6.5s", city_text)
+        self.assertIn('dur="1.8s"', city_text)
+        self.assertIn("8500ms", snake_text)
+        self.assertIn("62.69%", snake_text)
+
+    def test_single_snapshot_trend_has_a_repeating_signal_path(self) -> None:
+        geometry = trend_geometry(self.sample_history())
+        self.assertEqual(geometry.points, "700.0,55.0 910.0,55.0")
+        self.assertEqual(geometry.motion_path, "M 700.0 55.0 L 910.0 55.0")
+        self.assertEqual((geometry.final_x, geometry.final_y), (910.0, 55.0))
+
+    def test_rejects_upstream_snake_without_shared_duration(self) -> None:
+        root = ET.fromstring(
+            f'<svg xmlns="{SVG}"><style>.c{{animation:x 5s}}</style></svg>'
+        )
+        with self.assertRaisesRegex(ValueError, "18500ms"):
+            tune_snake_motion(root)
 
     def test_composes_byte_preserving_animated_and_valid_static_theme_variants(self) -> None:
         with tempfile.TemporaryDirectory() as directory_name:
@@ -159,9 +214,24 @@ class ContributionSignalComposerTests(unittest.TestCase):
                             )
                         )
                         self.assertRegex(source, CSS_MOTION)
+                        signal = next(
+                            element
+                            for element in root.iter()
+                            if element.attrib.get("id") == "signal-trend-dot"
+                        )
+                        motion = next(
+                            element
+                            for element in signal
+                            if local_name(element.tag) == "animatemotion"
+                        )
+                        self.assertEqual(motion.attrib["dur"], "3.2s")
+                        self.assertEqual(motion.attrib["repeatCount"], "indefinite")
+                        self.assertIn(
+                            "animation: draw 1.6s ease forwards", source
+                        )
 
     def test_layout_uses_approved_star_card_and_outer_border_dimensions(self) -> None:
-        minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
+        minimal_svg = self.valid_animated_svg()
         root = ET.fromstring(
             compose(
                 minimal_svg,
@@ -184,7 +254,7 @@ class ContributionSignalComposerTests(unittest.TestCase):
         )
 
     def test_star_total_meets_text_contrast_for_each_theme(self) -> None:
-        minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
+        minimal_svg = self.valid_animated_svg()
         fills = {}
         for theme_name in ("light", "dark"):
             with self.subTest(theme=theme_name):
@@ -217,7 +287,7 @@ class ContributionSignalComposerTests(unittest.TestCase):
         self.assertNotEqual(fills["light"], fills["dark"])
 
     def test_generated_description_is_motion_neutral_for_all_variants(self) -> None:
-        minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
+        minimal_svg = self.valid_animated_svg()
         for static in (False, True):
             with self.subTest(static=static):
                 root = ET.fromstring(
@@ -402,7 +472,9 @@ class ContributionSignalComposerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "2 MiB"):
                 compose_all(path, path, path, path, directory / "missing.json", directory)
 
-        large_source = f'<svg xmlns="{SVG}"><desc>' + ("x" * 1_100_000) + "</desc></svg>"
+        large_source = self.valid_animated_svg().replace(
+            "</svg>", "<desc>" + ("x" * 1_100_000) + "</desc></svg>"
+        )
         with self.assertRaisesRegex(ValueError, "2 MiB"):
             compose(
                 large_source,

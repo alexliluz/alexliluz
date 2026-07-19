@@ -3,6 +3,7 @@ import argparse
 import html
 import re
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 
 if __package__:
@@ -28,6 +29,7 @@ else:
 
 
 MAX_BYTES = MAX_SVG_BYTES
+SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 SMIL_LOCAL_NAMES = {
     "animate",
     "animatecolor",
@@ -35,6 +37,9 @@ SMIL_LOCAL_NAMES = {
     "animatetransform",
     "set",
 }
+ACTIVE_CITY_CLASS = re.compile(
+    r"city-(?:cont-(?:top|left|right)-[1-4]|rb-l[1-4]-(?:top|left|right))$"
+)
 CSS_IDENTIFIER_ESCAPE = (
     r"\\(?:[0-9a-f]{1,6}(?:\r\n|[ \t\r\n\f])?|[^\r\n\f])"
 )
@@ -84,6 +89,16 @@ THEMES = {
         "star": "#E3B341",
     },
 }
+
+
+@dataclass(frozen=True)
+class TrendGeometry:
+    points: str
+    motion_path: str
+    final_x: float
+    final_y: float
+    total: int
+    start_date: str
 
 
 def read_safe_svg(path: Path) -> str:
@@ -155,6 +170,73 @@ def static_source(source: str) -> str:
     return static
 
 
+def _append_smil(element: ET.Element, **attributes: str) -> None:
+    ET.SubElement(element, f"{{{SVG_NAMESPACE}}}animate", attributes)
+
+
+def tune_snake_motion(root: ET.Element) -> None:
+    replacements = 0
+    for element in root.iter():
+        if local_name(element.tag) != "style":
+            continue
+        element.text, count = re.subn(
+            r"(?<![0-9])18500ms(?![0-9])", "8500ms", element.text or ""
+        )
+        replacements += count
+    if replacements == 0:
+        raise ValueError("upstream snake CSS no longer contains 18500ms")
+
+
+def tune_city_motion(root: ET.Element, theme_name: str) -> None:
+    rainbow_replacements = 0
+    entrance_replacements = 0
+    active = []
+    for element in root.iter():
+        if local_name(element.tag) == "style" and theme_name == "dark":
+            element.text, count = re.subn(
+                r"(?<![0-9.])10s(?![0-9.])", "6.5s", element.text or ""
+            )
+            rainbow_replacements += count
+        if (
+            local_name(element.tag) in SMIL_LOCAL_NAMES
+            and element.attrib.get("dur") == "3s"
+            and element.attrib.get("attributeName")
+            in {"height", "transform", "points", "fill-opacity"}
+        ):
+            element.attrib["dur"] = "1.8s"
+            entrance_replacements += 1
+        if any(
+            ACTIVE_CITY_CLASS.fullmatch(token)
+            for token in element.attrib.get("class", "").split()
+        ):
+            active.append(element)
+    if theme_name == "dark" and rainbow_replacements == 0:
+        raise ValueError("upstream dark city CSS no longer contains 10s")
+    if entrance_replacements == 0:
+        raise ValueError("upstream city SMIL no longer contains 3s entrance motion")
+    if not active:
+        raise ValueError("upstream city no longer exposes active contribution classes")
+    for index, element in enumerate(active):
+        phase = (index % 24) * (6.5 / 24)
+        _append_smil(
+            element,
+            attributeName="opacity",
+            values="0.88;1;0.88",
+            dur="3.25s",
+            begin=f"-{phase:.2f}s",
+            repeatCount="indefinite",
+        )
+        if theme_name == "light":
+            _append_smil(
+                element,
+                attributeName="fill-opacity",
+                values="0.65;1;0.65",
+                dur="6.5s",
+                begin=f"-{phase:.2f}s",
+                repeatCount="indefinite",
+            )
+
+
 def position_imported_svg(
     root: ET.Element,
     *,
@@ -175,7 +257,7 @@ def position_imported_svg(
     return ET.tostring(root, encoding="unicode")
 
 
-def trend_points(history: dict) -> tuple[str, int, str]:
+def trend_geometry(history: dict) -> TrendGeometry:
     snapshots = history["snapshots"]
     if not snapshots:
         raise ValueError("star history has no snapshots")
@@ -183,16 +265,35 @@ def trend_points(history: dict) -> tuple[str, int, str]:
     minimum, maximum = min(totals), max(totals)
     span = max(maximum - minimum, 1)
     if len(totals) == 1:
-        # Keep a visible baseline from the first deployment onward.
-        points = ["700.0,55.0", "910.0,55.0"]
+        coordinates = [(700.0, 55.0), (910.0, 55.0)]
     else:
         denominator = len(totals) - 1
-        points = []
-        for index, total in enumerate(totals):
-            x = 700 + (index / denominator) * 210
-            y = 72 - ((total - minimum) / span) * 34
-            points.append(f"{x:.1f},{y:.1f}")
-    return " ".join(points), totals[-1], snapshots[0]["date"]
+        coordinates = [
+            (
+                700 + (index / denominator) * 210,
+                72 - ((total - minimum) / span) * 34,
+            )
+            for index, total in enumerate(totals)
+        ]
+    points = " ".join(f"{x:.1f},{y:.1f}" for x, y in coordinates)
+    motion_path = " ".join(
+        ("M" if index == 0 else "L") + f" {x:.1f} {y:.1f}"
+        for index, (x, y) in enumerate(coordinates)
+    )
+    final_x, final_y = coordinates[-1]
+    return TrendGeometry(
+        points=points,
+        motion_path=motion_path,
+        final_x=final_x,
+        final_y=final_y,
+        total=totals[-1],
+        start_date=snapshots[0]["date"],
+    )
+
+
+def trend_points(history: dict) -> tuple[str, int, str]:
+    geometry = trend_geometry(history)
+    return geometry.points, geometry.total, geometry.start_date
 
 
 def compose(
@@ -210,13 +311,26 @@ def compose(
         snake_source = static_source(snake_source)
     city_root = namespace_svg(city_source, "city")
     snake_root = namespace_svg(snake_source, "snake")
+    if not static:
+        tune_city_motion(city_root, theme_name)
+        tune_snake_motion(snake_root)
     city_markup = position_imported_svg(city_root, x=88, y=110, width=784, height=520)
     snake_markup = position_imported_svg(snake_root, x=42, y=695, width=876, height=191)
-    points, total, start_date = trend_points(history)
+    geometry = trend_geometry(history)
+    signal_markup = ""
     animation_style = "" if static else """
-      .trend { stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw 3s ease forwards; }
+      .trend { stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw 1.6s ease forwards; }
       @keyframes draw { to { stroke-dashoffset: 0; } }
     """
+    if not static:
+        signal_markup = f'''<defs>
+    <filter id="signal-trend-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+  <circle id="signal-trend-dot" r="4" fill="{theme['trend']}" filter="url(#signal-trend-glow)">
+    <animateMotion path="{geometry.motion_path}" dur="3.2s" repeatCount="indefinite"/>
+  </circle>'''
     source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 900" role="img" aria-labelledby="title description">
   <title id="title">Alex contribution signal</title>
   <desc id="description">Star trend, 3D contribution city, and original contribution-grid snake.</desc>
@@ -226,9 +340,10 @@ def compose(
   <text x="28" y="58" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="10" letter-spacing="1">PUBLIC ACTIVITY · DAILY</text>
   <rect x="650" y="18" width="282" height="70" rx="10" fill="{theme['background']}" stroke="{theme['border']}"/>
   <text x="696" y="37" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">STAR TREND</text>
-  <text x="910" y="37" text-anchor="end" fill="{theme['star']}" font-family="ui-monospace, monospace" font-size="12">★ {total}</text>
-  <polyline class="trend" points="{points}" fill="none" stroke="{theme['trend']}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="696" y="82" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="8">SNAPSHOTS FROM {html.escape(start_date)}</text>
+  <text x="910" y="37" text-anchor="end" fill="{theme['star']}" font-family="ui-monospace, monospace" font-size="12">★ {geometry.total}</text>
+  <polyline class="trend" points="{geometry.points}" fill="none" stroke="{theme['trend']}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  {signal_markup}
+  <text x="696" y="82" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="8">SNAPSHOTS FROM {html.escape(geometry.start_date)}</text>
   <text x="28" y="104" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">3D CONTRIBUTION CITY</text>
   {city_markup}
   <line x1="28" y1="650" x2="932" y2="650" stroke="{theme['border']}"/>
