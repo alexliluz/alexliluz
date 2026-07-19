@@ -153,6 +153,20 @@ class SvgNamespaceTests(unittest.TestCase):
 
         self.assertIn("animation/**/:city-pulse 1s linear", rendered)
 
+    def test_rewrites_css_escaped_animation_properties_in_block_and_inline_css(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>
+            @keyframes pulse{{to{{opacity:1}}}}
+            .tile{{\\61nimation:pulse 1s linear}}
+          </style>
+          <rect class="tile" style="\\61nimation:pulse 1s linear;\\61nimation-name:pulse"/>
+        </svg>'''
+
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+
+        self.assertEqual(rendered.count("\\61nimation:city-pulse 1s linear"), 2)
+        self.assertIn("\\61nimation-name:city-pulse", rendered)
+
     def test_rewrites_shorthand_name_without_rewriting_keyframe_timing_keyword(self) -> None:
         source = f'''<svg xmlns="{SVG}">
           <style>

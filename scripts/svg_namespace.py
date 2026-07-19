@@ -277,10 +277,13 @@ def _rewrite_css_id_references(css: str, id_map: dict[str, str]) -> str:
 
 
 def _rewrite_animation_names(css: str, keyframe_map: dict[str, str]) -> str:
+    animation_property = _css_identifier_pattern("animation")
+    animation_name_property = _css_identifier_pattern("animation-name")
     name_pattern = re.compile(
         r"((?:^|[;{])"
         + CSS_IGNORABLE
-        + r"(?:-[a-z]+-)?animation-name"
+        + r"(?:-[a-z]+-)?"
+        + animation_name_property
         + CSS_IGNORABLE
         + r":"
         + CSS_IGNORABLE
@@ -290,7 +293,8 @@ def _rewrite_animation_names(css: str, keyframe_map: dict[str, str]) -> str:
     shorthand_pattern = re.compile(
         r"((?:^|[;{])"
         + CSS_IGNORABLE
-        + r"(?:-[a-z]+-)?animation"
+        + r"(?:-[a-z]+-)?"
+        + animation_property
         + CSS_IGNORABLE
         + r":"
         + CSS_IGNORABLE
