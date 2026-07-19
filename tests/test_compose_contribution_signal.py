@@ -208,6 +208,33 @@ class ContributionSignalComposerTests(unittest.TestCase):
         self.assert_static_payload(static)
         ET.fromstring(static)
 
+    def test_staticization_preserves_first_keyframe_fill_as_fallback(self) -> None:
+        source = (
+            f'<svg xmlns="{SVG}">'
+            "<style>"
+            ".rainbow{animation:rainbow 10s linear infinite;}"
+            "@keyframes rainbow{"
+            "0.00%{fill:rgb(115, 38, 38)}"
+            "50.00%{fill:rgb(38, 115, 115)}"
+            "100.00%{fill:rgb(115, 38, 38)}}"
+            "</style>"
+            '<rect class="rainbow" width="10" height="10"/>'
+            "</svg>"
+        )
+
+        static = static_source(source)
+
+        self.assert_static_payload(static)
+        root = ET.fromstring(static)
+        style = next(
+            element.text or ""
+            for element in root.iter()
+            if local_name(element.tag) == "style"
+        )
+        fallback_rule = re.search(r"\.rainbow\s*\{([^{}]*)\}", style)
+        self.assertIsNotNone(fallback_rule)
+        self.assertIn("fill:rgb(115, 38, 38)", fallback_rule.group(1))
+
     def test_staticization_removes_vendor_prefixed_animation_declarations(self) -> None:
         source = (
             f'<svg xmlns="{SVG}">'

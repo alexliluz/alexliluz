@@ -53,6 +53,16 @@ CSS_MOTION_PROPERTY_PATTERN = re.compile(
     r"(?:-[a-z]+-)?(?:animation|transition)(?:-[a-z-]+)?",
     re.IGNORECASE,
 )
+CSS_FIRST_KEYFRAME_PATTERN = re.compile(
+    r"@(?:-[a-z]+-)?keyframes\s+"
+    r"(?P<name>[-_a-z0-9]+)\s*\{\s*"
+    r"(?:from|0(?:\.0+)?%)\s*\{(?P<body>[^{}]*)\}",
+    re.IGNORECASE,
+)
+CSS_FILL_DECLARATION_PATTERN = re.compile(
+    r"(?:^|;)\s*(?P<declaration>fill\s*:\s*[^;{}]+)",
+    re.IGNORECASE,
+)
 
 
 THEMES = {
@@ -99,6 +109,31 @@ def strip_css_motion_declarations(css: str) -> str:
         css = static
 
 
+def materialize_first_keyframe_fills(css: str) -> str:
+    for keyframe in list(CSS_FIRST_KEYFRAME_PATTERN.finditer(css)):
+        fill = CSS_FILL_DECLARATION_PATTERN.search(keyframe.group("body"))
+        if fill is None:
+            continue
+        class_rule = re.compile(
+            r"(?P<prefix>\."
+            + re.escape(keyframe.group("name"))
+            + r"\s*\{)(?P<body>[^{}]*)(?P<suffix>\})",
+            re.IGNORECASE,
+        )
+
+        def add_fallback(match: re.Match) -> str:
+            body = match.group("body")
+            if CSS_FILL_DECLARATION_PATTERN.search(body):
+                return match.group(0)
+            if body and not body.rstrip().endswith(";"):
+                body += ";"
+            body += fill.group("declaration") + ";"
+            return match.group("prefix") + body + match.group("suffix")
+
+        css = class_rule.sub(add_fallback, css, count=1)
+    return css
+
+
 def static_source(source: str) -> str:
     root = ET.fromstring(source)
     for parent in root.iter():
@@ -107,7 +142,9 @@ def static_source(source: str) -> str:
                 parent.remove(child)
     for element in root.iter():
         if local_name(element.tag) == "style":
-            element.text = strip_css_motion_declarations(element.text or "")
+            element.text = strip_css_motion_declarations(
+                materialize_first_keyframe_fills(element.text or "")
+            )
         if "style" in element.attrib:
             element.attrib["style"] = strip_css_motion_declarations(
                 element.attrib["style"]
