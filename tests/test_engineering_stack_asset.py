@@ -226,6 +226,109 @@ class EngineeringStackAssetTests(unittest.TestCase):
                                 f"{first[0]} overlaps {second[0]} at {width}px",
                             )
 
+    def test_mobile_text_keeps_real_font_safe_horizontal_margins(self) -> None:
+        widths = (320, 360, 375, 420)
+        safe_css_margin = 4
+        conservative_monospace_glyph_width_em = 0.68
+
+        for name, theme, animated in build_engineering_stack.OUTPUTS:
+            with self.subTest(name=name):
+                source = (ROOT / "assets" / name).read_text(encoding="utf-8")
+                self.assertEqual(
+                    source, build_engineering_stack.build_svg(theme, animated)
+                )
+                root = ET.fromstring(source)
+                shift_match = re.search(
+                    r"\.node-label-position\s*\{\s*"
+                    r"transform:translate\((\d+)px, 0\);\s*\}",
+                    source,
+                )
+                mobile_label_shift = int(shift_match.group(1)) if shift_match else 0
+
+                required_text = []
+                for element in root.findall(f".//{SVG}text"):
+                    classes = element.attrib.get("class", "").split()
+                    if not set(classes).intersection(
+                        {"title", "subtitle", "group-label", "node-label"}
+                    ):
+                        continue
+                    if "node-label" in classes:
+                        continue
+                    required_text.append(
+                        (
+                            element.text,
+                            float(element.attrib["x"]),
+                            "middle" if element.attrib.get("text-anchor") == "middle" else "start",
+                            classes[0],
+                        )
+                    )
+
+                for node in (
+                    element
+                    for element in root.findall(f".//{SVG}g")
+                    if "stack-node" in element.attrib.get("class", "").split()
+                ):
+                    mobile_x = int(
+                        re.search(
+                            r"--mobile-x:(\d+)px", node.attrib["style"]
+                        ).group(1)
+                    )
+                    wrapper = node.find(f"{SVG}g[@class='node-label-position']")
+                    if wrapper is None:
+                        label = next(
+                            text
+                            for text in node.findall(f"{SVG}text")
+                            if "node-label"
+                            in text.attrib.get("class", "").split()
+                        )
+                        shift = 0
+                    else:
+                        label = wrapper.find(f"{SVG}text[@class='node-label']")
+                        shift = mobile_label_shift
+                    required_text.append(
+                        (
+                            label.text,
+                            mobile_x + float(label.attrib["x"]) + shift,
+                            "middle",
+                            "node-label",
+                        )
+                    )
+
+                self.assertEqual(len(required_text), 12)
+                for width in widths:
+                    scale = width / 960
+                    for label, x, anchor, text_class in required_text:
+                        if text_class == "title":
+                            font_size = 28
+                        elif width <= 380:
+                            font_size = 27
+                        else:
+                            font_size = 21
+                        rendered_font_size = font_size * scale
+                        self.assertGreaterEqual(rendered_font_size, 9)
+                        rendered_width = (
+                            len(label)
+                            * rendered_font_size
+                            * conservative_monospace_glyph_width_em
+                        )
+                        rendered_x = x * scale
+                        left = (
+                            rendered_x - rendered_width / 2
+                            if anchor == "middle"
+                            else rendered_x
+                        )
+                        right = left + rendered_width
+                        self.assertGreaterEqual(
+                            left,
+                            safe_css_margin,
+                            f"{label} has only {left:.2f}px left margin at {width}px",
+                        )
+                        self.assertLessEqual(
+                            right,
+                            width - safe_css_margin,
+                            f"{label} has only {width - right:.2f}px right margin at {width}px",
+                        )
+
     def test_mobile_route_follows_every_node_center_in_approved_order(self) -> None:
         expected_path = "M" + " L".join(
             f"{x} {y}" for x, y in EXPECTED_MOBILE_CENTERS
@@ -387,12 +490,15 @@ class EngineeringStackAssetTests(unittest.TestCase):
                 ]
                 self.assertEqual(len(primary_nodes), 2)
                 self.assertEqual(
-                    tuple(node.find(f"{SVG}text[2]").text for node in primary_nodes),
+                    tuple(
+                        node.findall(f".//{SVG}text")[-1].text
+                        for node in primary_nodes
+                    ),
                     ("TypeScript", "Node.js"),
                 )
                 self.assertIn(".primary-node > rect { stroke-width:2; }", source)
                 self.assertIn(
-                    ".primary-node > .node-label { font-weight:700; }", source
+                    ".primary-node .node-label { font-weight:700; }", source
                 )
                 self.assertIn(
                     ".primary-node > text:first-of-type { font-weight:800; }",

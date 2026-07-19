@@ -10,7 +10,7 @@
       .subtitle,.group-label { fill:#8B949E; font-size:12px; font-weight:600; letter-spacing:2px; }
       .node-label { fill:#F0F6FC; font-size:12px; font-weight:600; }
       .primary-node > rect { stroke-width:2; }
-      .primary-node > .node-label { font-weight:700; }
+      .primary-node .node-label { font-weight:700; }
       .primary-node > text:first-of-type { font-weight:800; }
       .mobile-only { display:none; }
       
@@ -34,7 +34,7 @@
         .stack-node { transform:translate(var(--mobile-x), var(--mobile-y)); }
         .stack-node > rect { width:218px; height:70px; }
         .stack-node > text:first-of-type { font-size:16px; }
-        .stack-node > .node-label { x:122px; }
+        .node-label-position { transform:translate(70px, 0); }
       }
       @media (max-width: 380px) {
         .title { y:42px; }
@@ -62,37 +62,37 @@
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#3178C6" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#3178C6" font-size="10" font-weight="700">TS</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">TypeScript</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">TypeScript</text></g>
     </g><g class="stack-node primary-node animated-node" transform="translate(158 154)" style="--mobile-x:16px;--mobile-y:204px;--delay:0.85s;--mobile-delay:-0.314s">
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#3C873A" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#3C873A" font-size="10" font-weight="700">JS</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">Node.js</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">Node.js</text></g>
     </g><g class="stack-node animated-node" transform="translate(298 154)" style="--mobile-x:247px;--mobile-y:123px;--delay:1.70s;--mobile-delay:1.092s">
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#F69220" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#F69220" font-size="10" font-weight="700">pn</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">pnpm</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">pnpm</text></g>
     </g><g class="stack-node animated-node" transform="translate(428 154)" style="--mobile-x:247px;--mobile-y:204px;--delay:2.55s;--mobile-delay:1.558s">
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#2088FF" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#2088FF" font-size="10" font-weight="700">GH</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">GitHub Actions</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">GitHub Actions</text></g>
     </g><g class="stack-node animated-node" transform="translate(572 154)" style="--mobile-x:486px;--mobile-y:123px;--delay:3.40s;--mobile-delay:3.008s">
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#729B1B" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#729B1B" font-size="10" font-weight="700">Vi</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">Vitest</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">Vitest</text></g>
     </g><g class="stack-node animated-node" transform="translate(700 154)" style="--mobile-x:726px;--mobile-y:123px;--delay:4.25s;--mobile-delay:4.388s">
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#2EAD33" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#2EAD33" font-size="10" font-weight="700">Pw</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">Playwright</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">Playwright</text></g>
     </g><g class="stack-node animated-node" transform="translate(820 154)" style="--mobile-x:606px;--mobile-y:204px;--delay:5.10s;--mobile-delay:5.220s">
       <rect width="104" height="70" rx="14" fill="#10151D" stroke="#30363D"/>
       <circle cx="20" cy="22" r="10" fill="#F05032" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#F05032" font-size="10" font-weight="700">G</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">Git</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">Git</text></g>
     </g>
   
       <circle class="route-signal desktop-only" r="5" fill="#39D0D8" filter="url(#signal-glow)">

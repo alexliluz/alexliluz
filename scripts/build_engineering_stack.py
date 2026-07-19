@@ -187,7 +187,7 @@ def render_node(
       <rect width="104" height="70" rx="14" fill="{palette['panel']}" stroke="{palette['border']}"/>
       <circle cx="20" cy="22" r="10" fill="{node.accent}" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="{node.accent}" font-size="10" font-weight="700">{escape(node.mark)}</text>
-      <text x="52" y="52" text-anchor="middle" class="node-label">{escape(node.label)}</text>
+      <g class="node-label-position"><text x="52" y="52" text-anchor="middle" class="node-label">{escape(node.label)}</text></g>
     </g>'''
 
 
@@ -239,7 +239,7 @@ def build_svg(theme: str, animated: bool) -> str:
       .subtitle,.group-label {{ fill:{palette['muted']}; font-size:12px; font-weight:600; letter-spacing:2px; }}
       .node-label {{ fill:{palette['text']}; font-size:12px; font-weight:600; }}
       .primary-node > rect {{ stroke-width:2; }}
-      .primary-node > .node-label {{ font-weight:700; }}
+      .primary-node .node-label {{ font-weight:700; }}
       .primary-node > text:first-of-type {{ font-weight:800; }}
       .mobile-only {{ display:none; }}
       {motion_css}
@@ -260,7 +260,7 @@ def build_svg(theme: str, animated: bool) -> str:
         .stack-node {{ transform:translate(var(--mobile-x), var(--mobile-y)); }}
         .stack-node > rect {{ width:218px; height:70px; }}
         .stack-node > text:first-of-type {{ font-size:16px; }}
-        .stack-node > .node-label {{ x:122px; }}
+        .node-label-position {{ transform:translate(70px, 0); }}
       }}
       @media (max-width: 380px) {{
         .title {{ y:42px; }}
