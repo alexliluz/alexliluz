@@ -52,6 +52,7 @@ class ContributionSignalComposerTests(unittest.TestCase):
             @keyframes path{{62.69%{{fill:green}}62.71%{{fill:black}}}}
           </style>
           <rect class="rb-l1-top"><animate attributeName="height" dur="3s"/></rect>
+          <rect class="s s0"/>
         </svg>'''
 
     def write_svg(self, path: Path, marker: str) -> str:
@@ -65,6 +66,7 @@ class ContributionSignalComposerTests(unittest.TestCase):
             '<s:animateTransform attributeName="transform" type="rotate" '
             'from="0" to="360" dur="2s"/></g><rect class="rb-l1-top"><animate attributeName="height" values="2;10" dur="3s"/></rect></g></svg>'
         )
+        source = source.replace("</svg>", '<rect class="s s0"/></svg>')
         path.write_text(source, encoding="utf-8")
         return source
 
@@ -132,6 +134,7 @@ class ContributionSignalComposerTests(unittest.TestCase):
             .c{{animation:none 18500ms linear infinite}}
             @keyframes path{{62.69%{{fill:green}}62.71%{{fill:black}}}}
           </style>
+          <rect class="s s0"/>
         </svg>'''
         city = namespace_svg(city_source, "city")
         snake = namespace_svg(snake_source, "snake")
@@ -155,6 +158,16 @@ class ContributionSignalComposerTests(unittest.TestCase):
             f'<svg xmlns="{SVG}"><style>.c{{animation:x 5s}}</style></svg>'
         )
         with self.assertRaisesRegex(ValueError, "18500ms"):
+            tune_snake_motion(root)
+
+    def test_rejects_snake_duration_without_platane_moving_accents(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>.c{{animation:path 18500ms linear infinite}}</style>
+          <rect class="c"/>
+        </svg>'''
+        root = namespace_svg(source, "snake")
+
+        with self.assertRaisesRegex(ValueError, "moving accents"):
             tune_snake_motion(root)
 
     def test_snake_glow_targets_only_platane_moving_accents(self) -> None:
@@ -254,6 +267,11 @@ class ContributionSignalComposerTests(unittest.TestCase):
                         for element in root.iter()
                         if element.attrib.get("id") == "snake-root"
                     )
+                    snake_accent = next(
+                        element
+                        for element in snake.iter()
+                        if "snake-s" in element.attrib.get("class", "").split()
+                    )
                     self.assertEqual(
                         {key: city.attrib[key] for key in ("x", "y", "width", "height")},
                         {"x": "88", "y": "110", "width": "784", "height": "520"},
@@ -269,7 +287,13 @@ class ContributionSignalComposerTests(unittest.TestCase):
                     self.assertEqual(len(polyline.attrib["points"].split()), 2)
                     if suffix:
                         self.assert_static_payload(source)
+                        self.assertNotIn("snake-accent-glow", source)
+                        self.assertNotIn("filter", snake_accent.attrib)
                     else:
+                        self.assertEqual(
+                            snake_accent.attrib.get("filter"),
+                            "url(#snake-accent-glow)",
+                        )
                         self.assertTrue(
                             any(
                                 local_name(element.tag) == "animate"

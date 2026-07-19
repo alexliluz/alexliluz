@@ -220,7 +220,7 @@ def _add_snake_accent_glow(root: ET.Element) -> None:
         if _is_platane_snake_accent(element)
     ]
     if not accents:
-        return
+        raise ValueError("upstream snake no longer exposes Platane moving accents")
     if any(element.attrib.get("id") == SNAKE_ACCENT_GLOW_ID for element in root.iter()):
         raise ValueError(f"upstream snake reserves generated id: {SNAKE_ACCENT_GLOW_ID}")
     if any("filter" in element.attrib for element in accents):

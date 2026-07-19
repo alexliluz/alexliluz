@@ -117,6 +117,42 @@ class SvgNamespaceTests(unittest.TestCase):
         self.assertIn('url("#city-glow")', rendered)
         self.assertIn("url('#city-glow')", rendered)
 
+    def test_rewrites_smil_uri_value_references_for_href_targets(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <g id="a"/><g id="b"/>
+          <animate attributeName="href" from="#a" to="#b"
+            values="#a;#b" by="#a" dur="1s"/>
+          <animate attributeName="fill" from="#a" to="#b" dur="1s"/>
+        </svg>'''
+
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+
+        self.assertIn('from="#city-a"', rendered)
+        self.assertIn('to="#city-b"', rendered)
+        self.assertIn('values="#city-a;#city-b"', rendered)
+        self.assertIn('by="#city-a"', rendered)
+        self.assertIn('attributeName="fill" from="#a" to="#b"', rendered)
+
+    def test_rewrites_numeric_escaped_class_selector_without_corrupting_decimals(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>.\\35 {{opacity:.5}}</style><rect class="5"/>
+        </svg>'''
+
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+
+        self.assertIn(".city-5{opacity:.5}", rendered)
+        self.assertIn('class="city-5"', rendered)
+
+    def test_rewrites_comment_separated_inline_animation_property(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>@keyframes pulse{{to{{opacity:1}}}}</style>
+          <rect style="animation/**/:pulse 1s linear"/>
+        </svg>'''
+
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+
+        self.assertIn("animation/**/:city-pulse 1s linear", rendered)
+
     def test_rewrites_shorthand_name_without_rewriting_keyframe_timing_keyword(self) -> None:
         source = f'''<svg xmlns="{SVG}">
           <style>

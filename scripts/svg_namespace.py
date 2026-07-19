@@ -7,6 +7,8 @@ PREFIX = re.compile(r"^[a-z][a-z0-9-]*$")
 KEYFRAME = re.compile(r"(@(?:-[a-z]+-)?keyframes\s+)([-_A-Za-z][-_A-Za-z0-9]*)", re.I)
 CUSTOM_PROPERTY = re.compile(r"--([-_A-Za-z][-_A-Za-z0-9]*)")
 URL_FRAGMENT = re.compile(r'''(url\(\s*["']?#)([^\s"')]+)(?=\s*["']?\s*\))''', re.I)
+CSS_COMMENT = r"/\*(?:[^*]|\*(?!/))*\*/"
+CSS_IGNORABLE = r"(?:\s|" + CSS_COMMENT + r")*"
 IDREF_LIST_ATTRIBUTES = {
     "aria-activedescendant",
     "aria-controls",
@@ -16,6 +18,29 @@ IDREF_LIST_ATTRIBUTES = {
     "aria-flowto",
     "aria-labelledby",
     "aria-owns",
+}
+SMIL_LOCAL_NAMES = {
+    "animate",
+    "animatecolor",
+    "animatemotion",
+    "animatetransform",
+    "discard",
+    "set",
+}
+SMIL_VALUE_ATTRIBUTE_NAMES = {"by", "from", "to", "values"}
+URI_ATTRIBUTE_NAMES = {
+    "action",
+    "background",
+    "cite",
+    "data",
+    "formaction",
+    "href",
+    "longdesc",
+    "manifest",
+    "ping",
+    "poster",
+    "src",
+    "usemap",
 }
 
 
@@ -72,6 +97,10 @@ def namespace_svg(source: str, prefix: str) -> ET.Element:
             if local_name(name) == "style":
                 element.attrib[name] = _rewrite_css(
                     value, prefix, id_map, class_map, keyframe_map, property_map
+                )
+            elif _is_smil_uri_value_attribute(element, name):
+                element.attrib[name] = _rewrite_smil_uri_value(
+                    name, value, id_map
                 )
             else:
                 element.attrib[name] = _rewrite_value(name, value, id_map)
@@ -136,6 +165,41 @@ def _rewrite_value(name: str, value: str, id_map: dict[str, str]) -> str:
     return rewritten
 
 
+def _is_smil_uri_value_attribute(element: ET.Element, name: str) -> bool:
+    if (
+        local_name(element.tag) not in SMIL_LOCAL_NAMES
+        or local_name(name) not in SMIL_VALUE_ATTRIBUTE_NAMES
+    ):
+        return False
+    target = next(
+        (
+            value
+            for attribute, value in element.attrib.items()
+            if local_name(attribute) == "attributename"
+        ),
+        "",
+    )
+    return local_name(target).rsplit(":", 1)[-1].strip() in URI_ATTRIBUTE_NAMES
+
+
+def _rewrite_smil_uri_value(
+    name: str, value: str, id_map: dict[str, str]
+) -> str:
+    candidates = value.split(";") if local_name(name) == "values" else [value]
+    rewritten = []
+    for candidate in candidates:
+        match = re.fullmatch(r"(\s*)#([^\s;]+)(\s*)", candidate)
+        if match is None:
+            raise ValueError(
+                f"unsupported SMIL URI reference in {local_name(name)}: {value}"
+            )
+        fragment = match.group(2)
+        rewritten.append(
+            match.group(1) + "#" + id_map.get(fragment, fragment) + match.group(3)
+        )
+    return ";".join(rewritten)
+
+
 def _rewrite_css(
     css: str,
     prefix: str,
@@ -145,12 +209,7 @@ def _rewrite_css(
     property_map: dict[str, str],
 ) -> str:
     rewritten = re.sub(r"(?<![-_A-Za-z0-9]):root(?![-_A-Za-z0-9])", f"#{prefix}-root", css)
-    for old, new in _ordered(class_map):
-        rewritten = re.sub(
-            rf"(?<=\.){_css_identifier_pattern(old)}(?!{IDENTIFIER}|\\)",
-            _escape_css_identifier(new),
-            rewritten,
-        )
+    rewritten = _rewrite_css_class_selectors(rewritten, class_map)
     rewritten = _rewrite_css_id_references(rewritten, id_map)
     rewritten = KEYFRAME.sub(
         lambda match: match.group(1) + keyframe_map[match.group(2)], rewritten
@@ -182,6 +241,20 @@ def _escape_css_identifier(identifier: str) -> str:
     return re.sub(r"[^-_A-Za-z0-9]", lambda match: "\\" + match.group(0), identifier)
 
 
+def _rewrite_css_class_selectors(css: str, class_map: dict[str, str]) -> str:
+    def rewrite_selector(match: re.Match[str]) -> str:
+        selector = match.group(1)
+        for old, new in _ordered(class_map):
+            selector = re.sub(
+                rf"(?<=\.){_css_identifier_pattern(old)}(?!{IDENTIFIER}|\\)",
+                _escape_css_identifier(new),
+                selector,
+            )
+        return selector + "{"
+
+    return re.sub(r"([^{}]+)\{", rewrite_selector, css)
+
+
 def _rewrite_css_id_references(css: str, id_map: dict[str, str]) -> str:
     rewritten = css
     for old, new in _ordered(id_map):
@@ -205,10 +278,24 @@ def _rewrite_css_id_references(css: str, id_map: dict[str, str]) -> str:
 
 def _rewrite_animation_names(css: str, keyframe_map: dict[str, str]) -> str:
     name_pattern = re.compile(
-        r"((?:^|[;{])\s*(?:-[a-z]+-)?animation-name\s*:\s*)([^;{}]+)", re.I
+        r"((?:^|[;{])"
+        + CSS_IGNORABLE
+        + r"(?:-[a-z]+-)?animation-name"
+        + CSS_IGNORABLE
+        + r":"
+        + CSS_IGNORABLE
+        + r")([^;{}]+)",
+        re.I,
     )
     shorthand_pattern = re.compile(
-        r"((?:^|[;{])\s*(?:-[a-z]+-)?animation\s*:\s*)([^;{}]+)", re.I
+        r"((?:^|[;{])"
+        + CSS_IGNORABLE
+        + r"(?:-[a-z]+-)?animation"
+        + CSS_IGNORABLE
+        + r":"
+        + CSS_IGNORABLE
+        + r")([^;{}]+)",
+        re.I,
     )
 
     def rewrite_name_value(match: re.Match[str]) -> str:
@@ -297,6 +384,12 @@ def _assert_reference_integrity(root: ET.Element, old_ids: list[str]) -> None:
             for element in root.iter()
             for name, value in element.attrib.items()
         )
+        has_smil_uri_reference = any(
+            f"#{old}" in value.split(";")
+            for element in root.iter()
+            for name, value in element.attrib.items()
+            if _is_smil_uri_value_attribute(element, name)
+        )
         has_idref_reference = any(
             old in value.split()
             for element in root.iter()
@@ -308,7 +401,12 @@ def _assert_reference_integrity(root: ET.Element, old_ids: list[str]) -> None:
             for element in root.iter()
             if local_name(element.tag) == "style"
         )
-        if has_attribute_reference or has_idref_reference or has_css_reference:
+        if (
+            has_attribute_reference
+            or has_smil_uri_reference
+            or has_idref_reference
+            or has_css_reference
+        ):
             raise ValueError(f"unresolved local SVG reference: {old}")
 
 
