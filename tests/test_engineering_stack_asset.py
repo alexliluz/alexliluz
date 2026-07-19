@@ -520,6 +520,24 @@ class EngineeringStackAssetTests(unittest.TestCase):
                     build_engineering_stack.write_assets(output_dir)
                 self.assertEqual(tuple(output_dir.iterdir()), ())
 
+    def test_model_validation_rejects_a_duplicate_stack_group(self) -> None:
+        duplicate = (
+            *build_engineering_stack.STACK_GROUPS,
+            build_engineering_stack.STACK_GROUPS[0],
+        )
+        with self.assertRaisesRegex(
+            ValueError, r"\Aduplicate stack group: BUILD\Z"
+        ):
+            build_engineering_stack.validate_stack_model(duplicate)
+
+    def test_model_validation_rejects_an_unexpected_stack_group(self) -> None:
+        deploy = build_engineering_stack.StackGroup("DEPLOY", 0, 0, ())
+        extra = (*build_engineering_stack.STACK_GROUPS, deploy)
+        with self.assertRaisesRegex(
+            ValueError, r"\Aunexpected stack group: DEPLOY\Z"
+        ):
+            build_engineering_stack.validate_stack_model(extra)
+
     def test_model_validation_rejects_a_missing_technology_label(self) -> None:
         verify = build_engineering_stack.STACK_GROUPS[-1]
         incomplete = (
