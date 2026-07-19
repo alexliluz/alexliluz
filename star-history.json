@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "snapshots": [
+    {
+      "date": "2026-07-19",
+      "repos": {
+        "planarian": 1,
+        "ForkNeo": 1,
+        "api-image-neo": 0
+      }
+    }
+  ]
+}
