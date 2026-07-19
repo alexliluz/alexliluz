@@ -16,6 +16,24 @@ WORKFLOW = ROOT / ".github" / "workflows" / "generate-profile-assets.yml"
 VALIDATOR = ROOT / "scripts" / "validate_profile_assets.py"
 COMPOSER = ROOT / "scripts" / "compose_contribution_signal.py"
 STAR_HISTORY = ROOT / "scripts" / "profile_star_history.py"
+ENGINEERING_ASSETS = (
+    ROOT / "assets" / "engineering-stack-dark.svg",
+    ROOT / "assets" / "engineering-stack-light.svg",
+    ROOT / "assets" / "engineering-stack-dark-static.svg",
+    ROOT / "assets" / "engineering-stack-light-static.svg",
+)
+ENGINEERING_SOURCES = (
+    (
+        "(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)",
+        "./assets/engineering-stack-dark-static.svg",
+    ),
+    (
+        "(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)",
+        "./assets/engineering-stack-light-static.svg",
+    ),
+    ("(prefers-color-scheme: dark)", "./assets/engineering-stack-dark.svg"),
+    ("(prefers-color-scheme: light)", "./assets/engineering-stack-light.svg"),
+)
 GENERATED_ASSET_BASE = (
     "https://raw.githubusercontent.com/alexliluz/alexliluz/output/"
 )
@@ -53,6 +71,7 @@ class ProfileContractTests(unittest.TestCase):
             VALIDATOR,
             COMPOSER,
             STAR_HISTORY,
+            *ENGINEERING_ASSETS,
         ):
             self.assertTrue(path.is_file(), f"{path.relative_to(ROOT)} must exist")
 
@@ -67,7 +86,7 @@ class ProfileContractTests(unittest.TestCase):
         required = (
             "./assets/alex-signature.svg",
             positioning,
-            "## Tech stack",
+            "## Engineering Stack",
             "## Featured work",
             "## Contribution Signal",
             "[Explore all repositories →]",
@@ -85,35 +104,36 @@ class ProfileContractTests(unittest.TestCase):
         ):
             self.assertNotIn(removed, text)
 
-    def test_four_technology_badges_and_three_star_badges_are_present(self) -> None:
+    def test_engineering_stack_replaces_generic_technology_badges(self) -> None:
         text = self.read_readme()
-        technology_badges = re.findall(
-            r"https://img\.shields\.io/badge/[^\"\s>]+",
-            text,
+        self.assertNotIn("## Tech stack", text)
+        self.assertNotRegex(text, r"https://img\.shields\.io/badge/")
+        self.assertEqual(
+            len(re.findall(r"https://img\.shields\.io/github/stars/", text)),
+            3,
+        )
+
+    def test_engineering_stack_picture_selects_four_local_variants(self) -> None:
+        text = self.read_readme()
+        section = text[text.index("## Engineering Stack"):text.index("## Featured work")]
+        sources = re.findall(
+            r'<source media="([^"]+)" srcset="([^"]+)">',
+            section,
+        )
+        self.assertEqual(sources, list(ENGINEERING_SOURCES))
+        fallback = re.findall(
+            r'<img src="([^"]+)" alt="([^"]+)" width="100%">',
+            section,
         )
         self.assertEqual(
-            technology_badges,
-            [
-                "https://img.shields.io/badge/TypeScript-3178C6"
-                "?style=flat-square&logo=typescript&logoColor=white",
-                "https://img.shields.io/badge/Python-3776AB"
-                "?style=flat-square&logo=python&logoColor=white",
-                "https://img.shields.io/badge/Node.js-339933"
-                "?style=flat-square&logo=nodedotjs&logoColor=white",
-                "https://img.shields.io/badge/GitHub_Actions-2088FF"
-                "?style=flat-square&logo=githubactions&logoColor=white",
-            ],
+            fallback,
+            [(
+                "./assets/engineering-stack-light.svg",
+                "Alex engineering stack: TypeScript, Node.js, pnpm, GitHub Actions, Vitest, Playwright, and Git",
+            )],
         )
-        star_badges = re.findall(
-            r"https://img\.shields\.io/github/stars/[^\"\s>]+",
-            text,
-        )
-        self.assertEqual(len(star_badges), 3)
-        for repository in ("planarian", "ForkNeo", "api-image-neo"):
-            self.assertIn(
-                f"https://img.shields.io/github/stars/alexliluz/{repository}",
-                text,
-            )
+        self.assertEqual(text.count("<picture>"), 2)
+        self.assertEqual(text.count("</picture>"), 2)
 
     def test_featured_work_keeps_three_owned_projects_with_star_badges(self) -> None:
         text = self.read_readme()
@@ -155,9 +175,10 @@ class ProfileContractTests(unittest.TestCase):
         self,
     ) -> None:
         text = self.read_readme()
-        self.assertEqual(text.count("<picture>"), 1)
-        self.assertEqual(text.count("</picture>"), 1)
-        picture_match = re.search(r"<picture>\n(.*?)\n</picture>", text, re.DOTALL)
+        section = text[text.index("## Contribution Signal"):text.index("\n---", text.index("## Contribution Signal"))]
+        self.assertEqual(section.count("<picture>"), 1)
+        self.assertEqual(section.count("</picture>"), 1)
+        picture_match = re.search(r"<picture>\n(.*?)\n</picture>", section, re.DOTALL)
         self.assertIsNotNone(picture_match)
         picture = picture_match.group(1)
         sources = re.findall(
@@ -192,7 +213,8 @@ class ProfileContractTests(unittest.TestCase):
         self,
     ) -> None:
         text = self.read_readme()
-        picture = re.search(r"<picture>\n(.*?)\n</picture>", text, re.DOTALL)
+        section = text[text.index("## Contribution Signal"):text.index("\n---", text.index("## Contribution Signal"))]
+        picture = re.search(r"<picture>\n(.*?)\n</picture>", section, re.DOTALL)
         self.assertIsNotNone(picture)
         filenames = re.findall(
             r'<source media="[^"]+" srcset="[^"]+/([^"]+\.svg)">',
