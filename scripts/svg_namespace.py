@@ -20,6 +20,8 @@ def namespace_svg(source: str, prefix: str) -> ET.Element:
     duplicate = next((value for value in ids if ids.count(value) > 1), None)
     if duplicate:
         raise ValueError(f"duplicate SVG id: {duplicate}")
+    if "root" in ids and root.attrib.get("id") != "root":
+        raise ValueError("reserved SVG id: root")
 
     classes = {
         token
@@ -141,6 +143,7 @@ def _rewrite_css_id_references(css: str, id_map: dict[str, str]) -> str:
             rf'''(url\(\s*["']?#){re.escape(old)}(?!{IDENTIFIER})''',
             rf"\1{new}",
             rewritten,
+            flags=re.I,
         )
 
     def rewrite_selector(match: re.Match[str]) -> str:
@@ -171,7 +174,7 @@ def _rewrite_animation_names(css: str, keyframe_map: dict[str, str]) -> str:
         return match.group(1) + value
 
     def rewrite_shorthand(match: re.Match[str]) -> str:
-        animations = match.group(2).split(",")
+        animations = _split_top_level_commas(match.group(2))
         for index, animation in enumerate(animations):
             name_match = _find_animation_name(animation, keyframe_map)
             if name_match:
@@ -185,6 +188,22 @@ def _rewrite_animation_names(css: str, keyframe_map: dict[str, str]) -> str:
 
     rewritten = name_pattern.sub(rewrite_name_value, css)
     return shorthand_pattern.sub(rewrite_shorthand, rewritten)
+
+
+def _split_top_level_commas(value: str) -> list[str]:
+    animations = []
+    depth = 0
+    start = 0
+    for index, character in enumerate(value):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+        elif character == "," and depth == 0:
+            animations.append(value[start:index])
+            start = index + 1
+    animations.append(value[start:])
+    return animations
 
 
 def _find_animation_name(
@@ -234,7 +253,9 @@ def _assert_reference_integrity(root: ET.Element, old_ids: list[str]) -> None:
 
 
 def _has_css_id_reference(css: str, old: str) -> bool:
-    if re.search(rf'''url\(\s*["']?#{re.escape(old)}(?!{IDENTIFIER})''', css):
+    if re.search(
+        rf'''url\(\s*["']?#{re.escape(old)}(?!{IDENTIFIER})''', css, re.I
+    ):
         return True
     return any(
         re.search(rf"(?<=#){re.escape(old)}(?!{IDENTIFIER})", match.group(1))

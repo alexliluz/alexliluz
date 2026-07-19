@@ -104,6 +104,33 @@ class SvgNamespaceTests(unittest.TestCase):
         self.assertIn("@keyframes city-pulse", rendered)
         self.assertIn("animation:city-pulse 1s linear", rendered)
 
+    def test_rejects_child_id_that_collides_with_the_reserved_root_id(self) -> None:
+        source = f'<svg xmlns="{SVG}"><g id="root"/><use href="#root"/></svg>'
+        with self.assertRaisesRegex(ValueError, "reserved SVG id: root"):
+            namespace_svg(source, "city")
+
+    def test_rewrites_case_insensitive_css_url_functions(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>.tile{{filter:URL(#glow);mask:uRl("#glow")}}</style>
+          <filter id="glow"/>
+        </svg>'''
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+        self.assertIn("URL(#city-glow)", rendered)
+        self.assertIn('uRl("#city-glow")', rendered)
+
+    def test_does_not_split_animation_shorthand_commas_inside_functions(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>
+            @keyframes end{{to{{opacity:1}}}}
+            @keyframes pulse{{to{{opacity:.5}}}}
+            .tile{{animation:pulse 1s steps(3,end)}}
+          </style>
+        </svg>'''
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+        self.assertIn("@keyframes city-end", rendered)
+        self.assertIn("@keyframes city-pulse", rendered)
+        self.assertIn("animation:city-pulse 1s steps(3,end)", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
