@@ -53,7 +53,7 @@ CSS_DECLARATION_PATTERN = re.compile(
     + CSS_IDENTIFIER_ESCAPE
     + r"|[-_a-z0-9])+)"
     + CSS_IGNORABLE
-    + r":\s*[^;{}]*(?=;|}|$)",
+    + r":\s*(?P<value>[^;{}]*)(?=;|}|$)",
     re.IGNORECASE,
 )
 CSS_MOTION_PROPERTY_PATTERN = re.compile(
@@ -78,6 +78,24 @@ SMIL_TARGET = re.compile(
     r"(?<![-_A-Za-z0-9])([-_A-Za-z][-_A-Za-z0-9]*)(?=\.(?:begin|end|click|repeat))"
 )
 SNAKE_ACCENT_GLOW_ID = "snake-accent-glow"
+PLATANE_SNAKE_SELECTORS = {"c", "u", "s"}
+PLATANE_SNAKE_ANIMATION_VALUES = {
+    "c": re.compile(
+        r"^\s*none\s+(?P<duration>[1-9][0-9]*)ms(?![-._A-Za-z0-9])"
+        r"\s+linear\s+infinite\s*$",
+        re.IGNORECASE,
+    ),
+    "u": re.compile(
+        r"^\s*none\s+linear\s+(?P<duration>[1-9][0-9]*)ms"
+        r"(?![-._A-Za-z0-9])\s+infinite\s*$",
+        re.IGNORECASE,
+    ),
+    "s": re.compile(
+        r"^\s*none\s+linear\s+(?P<duration>[1-9][0-9]*)ms"
+        r"(?![-._A-Za-z0-9])\s+infinite\s*$",
+        re.IGNORECASE,
+    ),
+}
 
 
 THEMES = {
@@ -200,17 +218,90 @@ def _append_smil(element: ET.Element, **attributes: str) -> None:
 
 
 def tune_snake_motion(root: ET.Element) -> None:
-    replacements = 0
+    root_id = root.attrib.get("id", "")
+    if not root_id.endswith("-root"):
+        raise ValueError(
+            "upstream snake CSS no longer exposes one shared "
+            "Platane animation duration"
+        )
+    snake_prefix = root_id.removesuffix("-root")
+    rule_pattern = re.compile(
+        r"\."
+        + re.escape(snake_prefix)
+        + r"-(?P<selector>c|u|s)(?![-_A-Za-z0-9])\s*\{(?P<body>[^{}]*)\}",
+        re.IGNORECASE,
+    )
+    duration_locations = []
+    durations = []
     for element in root.iter():
         if local_name(element.tag) != "style":
             continue
-        element.text, count = re.subn(
-            r"(?<![0-9])18500ms(?![0-9])", "8500ms", element.text or ""
+        css = element.text or ""
+        selector_locations = {}
+        for rule in rule_pattern.finditer(css):
+            selector = rule.group("selector").lower()
+            animation_declarations = [
+                declaration
+                for declaration in CSS_DECLARATION_PATTERN.finditer(rule.group("body"))
+                if decode_css_escapes(declaration.group("property")).lower()
+                == "animation"
+            ]
+            if len(animation_declarations) != 1 or selector in selector_locations:
+                raise ValueError(
+                    "upstream snake CSS no longer exposes a compatible "
+                    "Platane animation shorthand"
+                )
+            declaration = animation_declarations[0]
+            animation = PLATANE_SNAKE_ANIMATION_VALUES[selector].fullmatch(
+                declaration.group("value")
+            )
+            if animation is None:
+                raise ValueError(
+                    "upstream snake CSS no longer exposes a compatible "
+                    "Platane animation shorthand"
+                )
+            selector_locations[selector] = (
+                rule.start("body")
+                + declaration.start("value")
+                + animation.start("duration"),
+                rule.start("body")
+                + declaration.start("value")
+                + animation.end("duration"),
+            )
+            durations.append(animation.group("duration") + "ms")
+        if selector_locations:
+            if set(selector_locations) != PLATANE_SNAKE_SELECTORS:
+                raise ValueError(
+                    "upstream snake CSS no longer exposes one shared "
+                    "Platane animation duration"
+                )
+            duration_locations.extend(
+                (element, *location) for location in selector_locations.values()
+            )
+    if len(duration_locations) != len(PLATANE_SNAKE_SELECTORS):
+        raise ValueError(
+            "upstream snake CSS no longer exposes one shared "
+            "Platane animation duration"
         )
-        replacements += count
-    if replacements == 0:
-        raise ValueError("upstream snake CSS no longer contains 18500ms")
+    if len(set(durations)) != 1:
+        raise ValueError(
+            "upstream snake CSS contains conflicting Platane animation durations"
+        )
+    _validate_snake_accents(root)
+    for element, start, end in reversed(duration_locations):
+        css = element.text or ""
+        element.text = css[:start] + "8500" + css[end:]
     _add_snake_accent_glow(root)
+
+
+def _validate_snake_accents(root: ET.Element) -> None:
+    accents = [element for element in root.iter() if _is_platane_snake_accent(element)]
+    if not accents:
+        raise ValueError("upstream snake no longer exposes Platane moving accents")
+    if any(element.attrib.get("id") == SNAKE_ACCENT_GLOW_ID for element in root.iter()):
+        raise ValueError(f"upstream snake reserves generated id: {SNAKE_ACCENT_GLOW_ID}")
+    if any("filter" in element.attrib for element in accents):
+        raise ValueError("upstream snake moving accent already defines a filter")
 
 
 def _add_snake_accent_glow(root: ET.Element) -> None:
@@ -219,12 +310,6 @@ def _add_snake_accent_glow(root: ET.Element) -> None:
         for element in root.iter()
         if _is_platane_snake_accent(element)
     ]
-    if not accents:
-        raise ValueError("upstream snake no longer exposes Platane moving accents")
-    if any(element.attrib.get("id") == SNAKE_ACCENT_GLOW_ID for element in root.iter()):
-        raise ValueError(f"upstream snake reserves generated id: {SNAKE_ACCENT_GLOW_ID}")
-    if any("filter" in element.attrib for element in accents):
-        raise ValueError("upstream snake moving accent already defines a filter")
 
     defs = next(
         (element for element in root if local_name(element.tag) == "defs"), None

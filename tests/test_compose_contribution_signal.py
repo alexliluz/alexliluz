@@ -47,18 +47,20 @@ class ContributionSignalComposerTests(unittest.TestCase):
         return f'''<svg xmlns="{SVG}" viewBox="0 0 1 1">
           <style>
             .rb-l1-top{{animation:rb-l1-top 10s linear infinite}}
-            .snake{{animation:path 18500ms linear infinite}}
+            .c{{animation:none 18500ms linear infinite}}
+            .u{{animation:none linear 18500ms infinite}}
+            .s{{animation:none linear 18500ms infinite}}
             @keyframes rb-l1-top{{0%{{fill:red}}100%{{fill:blue}}}}
             @keyframes path{{62.69%{{fill:green}}62.71%{{fill:black}}}}
           </style>
           <rect class="rb-l1-top"><animate attributeName="height" dur="3s"/></rect>
-          <rect class="s s0"/>
+          <rect class="c"/><rect class="u"/><rect class="s s0"/>
         </svg>'''
 
     def write_svg(self, path: Path, marker: str) -> str:
         source = (
             f'<svg xmlns="{SVG}" xmlns:s="{SVG}" viewBox="0 0 100 40">'
-            '<style>.moving{animation:pulse 2s infinite}.rb-l1-top{animation:rb-l1-top 10s linear infinite}.snake{animation:path 18500ms linear infinite}@keyframes rb-l1-top{0%{fill:red}100%{fill:blue}}@keyframes path{62.69%{fill:green}62.71%{fill:black}}</style>'
+            '<style>.moving{animation:pulse 2s infinite}.rb-l1-top{animation:rb-l1-top 10s linear infinite}.c{animation:none 18500ms linear infinite}.u{animation:none linear 18500ms infinite}.s{animation:none linear 18500ms infinite}@keyframes rb-l1-top{0%{fill:red}100%{fill:blue}}@keyframes path{62.69%{fill:green}62.71%{fill:black}}</style>'
             '<g style="animation-delay:0.000s"><text>'
             f'{marker}</text><g class="moving">'
             '<animate attributeName="opacity" values="0;1" dur="2s" '
@@ -66,7 +68,9 @@ class ContributionSignalComposerTests(unittest.TestCase):
             '<s:animateTransform attributeName="transform" type="rotate" '
             'from="0" to="360" dur="2s"/></g><rect class="rb-l1-top"><animate attributeName="height" values="2;10" dur="3s"/></rect></g></svg>'
         )
-        source = source.replace("</svg>", '<rect class="s s0"/></svg>')
+        source = source.replace(
+            "</svg>", '<rect class="c"/><rect class="u"/><rect class="s s0"/></svg>'
+        )
         path.write_text(source, encoding="utf-8")
         return source
 
@@ -132,8 +136,12 @@ class ContributionSignalComposerTests(unittest.TestCase):
         snake_source = f'''<svg xmlns="{SVG}">
           <style>
             .c{{animation:none 18500ms linear infinite}}
+            .u{{animation:none linear 18500ms infinite}}
+            .s{{animation:none linear 18500ms infinite}}
             @keyframes path{{62.69%{{fill:green}}62.71%{{fill:black}}}}
           </style>
+          <rect class="c"/>
+          <rect class="u"/>
           <rect class="s s0"/>
         </svg>'''
         city = namespace_svg(city_source, "city")
@@ -144,8 +152,117 @@ class ContributionSignalComposerTests(unittest.TestCase):
         snake_text = ET.tostring(snake, encoding="unicode")
         self.assertIn("6.5s", city_text)
         self.assertIn('dur="1.8s"', city_text)
-        self.assertIn("8500ms", snake_text)
+        for declaration in (
+            ".snake-c{animation:none 8500ms linear infinite}",
+            ".snake-u{animation:none linear 8500ms infinite}",
+            ".snake-s{animation:none linear 8500ms infinite}",
+        ):
+            self.assertIn(declaration, snake_text)
+        self.assertNotIn("18500ms", snake_text)
+        self.assertNotIn("msms", snake_text)
         self.assertIn("62.69%", snake_text)
+
+    def test_normalizes_current_route_derived_shared_snake_duration(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>
+            .c{{animation:none 8700ms linear infinite}}
+            .u{{animation:none linear 8700ms infinite}}
+            .s{{animation:none linear 8700ms infinite}}
+            .other{{animation:unrelated 3100ms linear infinite}}
+            @keyframes s0{{62.69%{{transform:translate(1px, 2px)}}}}
+          </style>
+          <rect class="c"/>
+          <rect class="u"/>
+          <rect class="s s0"/>
+          <rect class="other"/>
+        </svg>'''
+        root = namespace_svg(source, "snake")
+
+        tune_snake_motion(root)
+
+        result = ET.tostring(root, encoding="unicode")
+        self.assertEqual(result.count("8500ms"), 3)
+        self.assertNotIn("8700ms", result)
+        self.assertNotIn("msms", result)
+        for declaration in (
+            ".snake-c{animation:none 8500ms linear infinite}",
+            ".snake-u{animation:none linear 8500ms infinite}",
+            ".snake-s{animation:none linear 8500ms infinite}",
+        ):
+            self.assertIn(declaration, result)
+        self.assertIn("3100ms", result)
+        self.assertIn("62.69%", result)
+
+    def test_rejects_conflicting_platane_snake_durations(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>
+            .c{{animation:none 8700ms linear infinite}}
+            .u{{animation:none linear 8800ms infinite}}
+            .s{{animation:none linear 8700ms infinite}}
+          </style>
+          <rect class="c"/><rect class="u"/><rect class="s s0"/>
+        </svg>'''
+        root = namespace_svg(source, "snake")
+        original = ET.tostring(root, encoding="unicode")
+
+        with self.assertRaisesRegex(ValueError, "conflicting Platane animation durations"):
+            tune_snake_motion(root)
+        self.assertEqual(ET.tostring(root, encoding="unicode"), original)
+
+    def test_rejects_non_pinned_platane_animation_shorthands(self) -> None:
+        valid = (
+            "none 8700ms linear infinite",
+            "none linear 8700ms infinite",
+            "none linear 8700ms infinite",
+        )
+        cases = {
+            "negative duration": (
+                "none -8700ms linear infinite",
+                valid[1],
+                valid[2],
+            ),
+            "decimal duration": (
+                "none 8.700ms linear infinite",
+                valid[1],
+                valid[2],
+            ),
+            "extra matching duration": (
+                "none 8700ms linear 8700ms infinite",
+                valid[1],
+                valid[2],
+            ),
+            "extra conflicting duration": (
+                valid[0],
+                "none linear 8700ms 8800ms infinite",
+                valid[2],
+            ),
+            "comma animation list": (
+                "none 8700ms linear infinite, spin 2s infinite",
+                valid[1],
+                valid[2],
+            ),
+            "spin animation name": ("spin 8700ms linear infinite", valid[1], valid[2]),
+            "wobble animation name": (valid[0], "wobble linear 8700ms infinite", valid[2]),
+            "fade animation name": (valid[0], valid[1], "fade linear 8700ms infinite"),
+        }
+        for case_name, (grid, stack, snake) in cases.items():
+            with self.subTest(case=case_name):
+                source = f'''<svg xmlns="{SVG}">
+                  <style>
+                    .c{{animation:{grid}}}
+                    .u{{animation:{stack}}}
+                    .s{{animation:{snake}}}
+                  </style>
+                  <rect class="c"/><rect class="u"/><rect class="s s0"/>
+                </svg>'''
+                root = namespace_svg(source, "snake")
+                original = ET.tostring(root, encoding="unicode")
+
+                with self.assertRaisesRegex(
+                    ValueError, "compatible Platane animation shorthand"
+                ):
+                    tune_snake_motion(root)
+                self.assertEqual(ET.tostring(root, encoding="unicode"), original)
 
     def test_single_snapshot_trend_has_a_repeating_signal_path(self) -> None:
         geometry = trend_geometry(self.sample_history())
@@ -154,26 +271,33 @@ class ContributionSignalComposerTests(unittest.TestCase):
         self.assertEqual((geometry.final_x, geometry.final_y), (910.0, 55.0))
 
     def test_rejects_upstream_snake_without_shared_duration(self) -> None:
-        root = ET.fromstring(
-            f'<svg xmlns="{SVG}"><style>.c{{animation:x 5s}}</style></svg>'
-        )
-        with self.assertRaisesRegex(ValueError, "18500ms"):
+        source = f'''<svg xmlns="{SVG}">
+          <style>.c{{animation:none linear infinite}}.u{{animation:none linear infinite}}.s{{animation:none linear infinite}}</style>
+          <rect class="c"/><rect class="u"/><rect class="s"/>
+        </svg>'''
+        root = namespace_svg(source, "snake")
+        with self.assertRaisesRegex(
+            ValueError, "compatible Platane animation shorthand"
+        ):
             tune_snake_motion(root)
 
     def test_rejects_snake_duration_without_platane_moving_accents(self) -> None:
         source = f'''<svg xmlns="{SVG}">
-          <style>.c{{animation:path 18500ms linear infinite}}</style>
-          <rect class="c"/>
+          <style>.c{{animation:none 18500ms linear infinite}}.u{{animation:none linear 18500ms infinite}}.s{{animation:none linear 18500ms infinite}}</style>
+          <rect class="c"/><rect class="u"/><rect class="s"/>
         </svg>'''
         root = namespace_svg(source, "snake")
+        original = ET.tostring(root, encoding="unicode")
 
         with self.assertRaisesRegex(ValueError, "moving accents"):
             tune_snake_motion(root)
+        self.assertEqual(ET.tostring(root, encoding="unicode"), original)
 
     def test_snake_glow_targets_only_platane_moving_accents(self) -> None:
         source = f'''<svg xmlns="{SVG}">
-          <style>.s{{animation:s0 18500ms linear infinite}}.c{{fill:#39d353}}</style>
+          <style>.c{{animation:none 18500ms linear infinite}}.u{{animation:none linear 18500ms infinite}}.s{{animation:none linear 18500ms infinite}}</style>
           <rect class="c" x="2" y="2"/>
+          <rect class="u" x="10" y="2"/>
           <rect class="s s0" x="18" y="2"/>
           <rect class="s s1" x="34" y="2"/>
         </svg>'''
