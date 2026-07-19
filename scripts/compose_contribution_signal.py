@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import base64
 import html
 import re
 import xml.etree.ElementTree as ET
@@ -8,6 +7,7 @@ from pathlib import Path
 
 if __package__:
     from scripts.profile_star_history import load_history
+    from scripts.svg_namespace import namespace_svg
     from scripts.validate_profile_assets import (
         MAX_SVG_BYTES,
         decode_css_escapes,
@@ -17,6 +17,7 @@ if __package__:
     )
 else:
     from profile_star_history import load_history
+    from svg_namespace import namespace_svg
     from validate_profile_assets import (
         MAX_SVG_BYTES,
         decode_css_escapes,
@@ -154,9 +155,24 @@ def static_source(source: str) -> str:
     return static
 
 
-def data_uri(source: str) -> str:
-    payload = base64.b64encode(source.encode("utf-8")).decode("ascii")
-    return f"data:image/svg+xml;base64,{payload}"
+def position_imported_svg(
+    root: ET.Element,
+    *,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+) -> str:
+    root.attrib.update(
+        {
+            "x": str(x),
+            "y": str(y),
+            "width": str(width),
+            "height": str(height),
+            "preserveAspectRatio": "xMidYMid meet",
+        }
+    )
+    return ET.tostring(root, encoding="unicode")
 
 
 def trend_points(history: dict) -> tuple[str, int, str]:
@@ -192,28 +208,32 @@ def compose(
     if static:
         city_source = static_source(city_source)
         snake_source = static_source(snake_source)
+    city_root = namespace_svg(city_source, "city")
+    snake_root = namespace_svg(snake_source, "snake")
+    city_markup = position_imported_svg(city_root, x=88, y=110, width=784, height=520)
+    snake_markup = position_imported_svg(snake_root, x=42, y=695, width=876, height=191)
     points, total, start_date = trend_points(history)
     animation_style = "" if static else """
       .trend { stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw 3s ease forwards; }
       @keyframes draw { to { stroke-dashoffset: 0; } }
     """
-    source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 660" role="img" aria-labelledby="title description">
+    source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 900" role="img" aria-labelledby="title description">
   <title id="title">Alex contribution signal</title>
   <desc id="description">Star trend, 3D contribution city, and original contribution-grid snake.</desc>
   <style>{animation_style}</style>
-  <rect x="1" y="1" width="958" height="658" rx="18" fill="{theme['background']}" stroke="{theme['border']}" stroke-width="2"/>
+  <rect x="1" y="1" width="958" height="898" rx="18" fill="{theme['background']}" stroke="{theme['border']}" stroke-width="2"/>
   <text x="28" y="38" fill="{theme['primary']}" font-family="ui-monospace, monospace" font-size="15" font-weight="600" letter-spacing="3">CONTRIBUTION SIGNAL</text>
   <text x="28" y="58" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="10" letter-spacing="1">PUBLIC ACTIVITY · DAILY</text>
-  <rect x="680" y="18" width="252" height="70" rx="10" fill="{theme['background']}" stroke="{theme['border']}"/>
+  <rect x="650" y="18" width="282" height="70" rx="10" fill="{theme['background']}" stroke="{theme['border']}"/>
   <text x="696" y="37" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">STAR TREND</text>
   <text x="910" y="37" text-anchor="end" fill="{theme['star']}" font-family="ui-monospace, monospace" font-size="12">★ {total}</text>
   <polyline class="trend" points="{points}" fill="none" stroke="{theme['trend']}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="696" y="82" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="8">SNAPSHOTS FROM {html.escape(start_date)}</text>
   <text x="28" y="104" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">3D CONTRIBUTION CITY</text>
-  <image x="20" y="110" width="920" height="350" preserveAspectRatio="xMidYMid meet" href="{data_uri(city_source)}"/>
-  <line x1="28" y1="472" x2="932" y2="472" stroke="{theme['border']}"/>
-  <text x="28" y="494" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">ORIGINAL CONTRIBUTION SNAKE</text>
-  <image x="20" y="500" width="920" height="140" preserveAspectRatio="xMidYMid meet" href="{data_uri(snake_source)}"/>
+  {city_markup}
+  <line x1="28" y1="650" x2="932" y2="650" stroke="{theme['border']}"/>
+  <text x="28" y="675" fill="{theme['muted']}" font-family="ui-monospace, monospace" font-size="9" letter-spacing="1">ORIGINAL CONTRIBUTION SNAKE</text>
+  {snake_markup}
 </svg>
 '''
     validate_svg_source(source)

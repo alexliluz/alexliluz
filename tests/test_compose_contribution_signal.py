@@ -1,4 +1,3 @@
-import base64
 import json
 import re
 import subprocess
@@ -65,12 +64,6 @@ class ContributionSignalComposerTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def payloads(self, path: Path) -> list[str]:
-        source = path.read_text(encoding="utf-8")
-        encoded = re.findall(r"data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)", source)
-        self.assertEqual(len(encoded), 2)
-        return [base64.b64decode(payload).decode("utf-8") for payload in encoded]
-
     def assert_static_payload(self, source: str) -> None:
         root = ET.fromstring(source)
         for element in root.iter():
@@ -122,28 +115,73 @@ class ContributionSignalComposerTests(unittest.TestCase):
             output = directory / "output"
             compose_all(city_light, city_dark, snake_light, snake_dark, history, output)
 
-            for theme_name, expected_payloads in inputs.items():
+            for theme_name in inputs:
                 for suffix in ("", "-static"):
                     path = output / f"contribution-signal-{theme_name}{suffix}.svg"
                     self.assertTrue(path.is_file(), path.name)
                     root = ET.parse(path).getroot()
-                    self.assertEqual(root.attrib["viewBox"], "0 0 960 660")
+                    self.assertEqual(root.attrib["viewBox"], "0 0 960 900")
                     source = path.read_text(encoding="utf-8")
+                    self.assertNotIn("data:image/svg+xml", source)
                     self.assertIn("CONTRIBUTION SIGNAL", source)
                     self.assertIn("STAR TREND", source)
                     self.assertIn("SNAPSHOTS FROM 2026-07-19", source)
+                    city = next(
+                        element
+                        for element in root.iter()
+                        if element.attrib.get("id") == "city-root"
+                    )
+                    snake = next(
+                        element
+                        for element in root.iter()
+                        if element.attrib.get("id") == "snake-root"
+                    )
+                    self.assertEqual(
+                        {key: city.attrib[key] for key in ("x", "y", "width", "height")},
+                        {"x": "88", "y": "110", "width": "784", "height": "520"},
+                    )
+                    self.assertEqual(
+                        {key: snake.attrib[key] for key in ("x", "y", "width", "height")},
+                        {"x": "42", "y": "695", "width": "876", "height": "191"},
+                    )
+                    self.assertIn("ORIGINAL-CITY-", source)
+                    self.assertIn("ORIGINAL-SNAKE-", source)
                     polyline = root.find(f"{{{SVG}}}polyline")
                     self.assertIsNotNone(polyline)
                     self.assertEqual(len(polyline.attrib["points"].split()), 2)
-                    payloads = self.payloads(path)
                     if suffix:
-                        for payload in payloads:
-                            self.assert_static_payload(payload)
+                        self.assert_static_payload(source)
                     else:
-                        self.assertEqual(payloads, list(expected_payloads))
-                        for payload in payloads:
-                            self.assertIn("<animate", payload)
-                            self.assertRegex(payload, CSS_MOTION)
+                        self.assertTrue(
+                            any(
+                                local_name(element.tag) == "animate"
+                                for element in root.iter()
+                            )
+                        )
+                        self.assertRegex(source, CSS_MOTION)
+
+    def test_layout_uses_approved_star_card_and_outer_border_dimensions(self) -> None:
+        minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
+        root = ET.fromstring(
+            compose(
+                minimal_svg,
+                minimal_svg,
+                self.sample_history(),
+                "light",
+                False,
+            )
+        )
+        border, star_card = [
+            element for element in root if local_name(element.tag) == "rect"
+        ]
+        self.assertEqual(
+            {key: border.attrib[key] for key in ("width", "height")},
+            {"width": "958", "height": "898"},
+        )
+        self.assertEqual(
+            {key: star_card.attrib[key] for key in ("x", "y", "width", "height")},
+            {"x": "650", "y": "18", "width": "282", "height": "70"},
+        )
 
     def test_star_total_meets_text_contrast_for_each_theme(self) -> None:
         minimal_svg = f'<svg xmlns="{SVG}" viewBox="0 0 1 1"/>'
@@ -364,7 +402,7 @@ class ContributionSignalComposerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "2 MiB"):
                 compose_all(path, path, path, path, directory / "missing.json", directory)
 
-        large_source = f'<svg xmlns="{SVG}"><desc>' + ("x" * 800_000) + "</desc></svg>"
+        large_source = f'<svg xmlns="{SVG}"><desc>' + ("x" * 1_100_000) + "</desc></svg>"
         with self.assertRaisesRegex(ValueError, "2 MiB"):
             compose(
                 large_source,
