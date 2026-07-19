@@ -131,8 +131,8 @@ def validate_stack_model(groups: tuple[StackGroup, ...]) -> None:
         raise ValueError("primary technologies must be exactly: TypeScript, Node.js")
 
 
-def mobile_route_path(groups: tuple[StackGroup, ...]) -> str:
-    points = tuple(
+def mobile_route_points(groups: tuple[StackGroup, ...]) -> tuple[tuple[int, int], ...]:
+    return tuple(
         (
             MOBILE_NODE_POSITIONS[node.label][0] + 109,
             MOBILE_NODE_POSITIONS[node.label][1] + 35,
@@ -140,10 +140,34 @@ def mobile_route_path(groups: tuple[StackGroup, ...]) -> str:
         for group in groups
         for node in group.nodes
     )
+
+
+def mobile_route_path(groups: tuple[StackGroup, ...]) -> str:
+    points = mobile_route_points(groups)
     return "M" + " L".join(f"{x} {y}" for x, y in points)
 
 
-def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str:
+def mobile_signal_arrival_times(groups: tuple[StackGroup, ...]) -> tuple[float, ...]:
+    points = mobile_route_points(groups)
+    segment_lengths = tuple(
+        ((end_x - start_x) ** 2 + (end_y - start_y) ** 2) ** 0.5
+        for (start_x, start_y), (end_x, end_y) in zip(points, points[1:])
+    )
+    total_length = sum(segment_lengths)
+    arrivals = [0.0]
+    travelled = 0.0
+    for length in segment_lengths:
+        travelled += length
+        arrivals.append(6 * travelled / total_length)
+    return tuple(arrivals)
+
+
+def render_node(
+    node: StackNode,
+    palette: dict[str, str],
+    animated: bool,
+    mobile_arrival: float,
+) -> str:
     mobile_x, mobile_y = MOBILE_NODE_POSITIONS[node.label]
     style_declarations = [
         f"--mobile-x:{mobile_x}px",
@@ -151,6 +175,7 @@ def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str
     ]
     if animated:
         style_declarations.append(f"--delay:{node.delay:.2f}s")
+        style_declarations.append(f"--mobile-delay:{mobile_arrival - 0.78:.3f}s")
     style = f' style="{";".join(style_declarations)}"'
     classes = ["stack-node"]
     if node.primary:
@@ -172,13 +197,20 @@ def build_svg(theme: str, animated: bool) -> str:
         raise ValueError(f"unsupported theme: {theme}")
     palette = PALETTES[theme]
     mobile_route = mobile_route_path(STACK_GROUPS)
-    groups = "".join(
+    mobile_arrivals = mobile_signal_arrival_times(STACK_GROUPS)
+    group_backgrounds = "".join(
         f'''<g class="stack-group">
           <rect x="{group.x}" y="118" width="{group.width}" height="130" rx="18" fill="{palette['panel']}" stroke="{palette['border']}"/>
           <text x="{group.x + 18}" y="142" class="group-label">{group.name}</text>
-          {''.join(render_node(node, palette, animated) for node in group.nodes)}
         </g>'''
         for group in STACK_GROUPS
+    )
+    nodes = "".join(
+        render_node(node, palette, animated, arrival)
+        for node, arrival in zip(
+            (node for group in STACK_GROUPS for node in group.nodes),
+            mobile_arrivals,
+        )
     )
     motion_css = "" if not animated else '''
       @keyframes node-signal { 0%,72%,100% { filter:none; } 8%,18% { filter:url(#node-glow); } }
@@ -214,6 +246,7 @@ def build_svg(theme: str, animated: bool) -> str:
       @media (max-width: 480px) {{
         .desktop-only {{ display:none; }}
         .mobile-only {{ display:inline; }}
+        .animated-node {{ animation-delay:var(--mobile-delay); }}
         .title {{ font-size:28px; letter-spacing:2px; }}
         .subtitle {{ font-size:21px; letter-spacing:1px; }}
         .group-label {{ font-size:21px; letter-spacing:1px; }}
@@ -239,9 +272,10 @@ def build_svg(theme: str, animated: bool) -> str:
   <rect x="1" y="1" width="958" height="298" rx="22" fill="{palette['surface']}" stroke="{palette['border']}" stroke-width="2"/>
   <text x="30" y="48" class="title">ENGINEERING STACK</text>
   <text x="30" y="75" class="subtitle">PUBLIC TOOLCHAIN · VERIFIED BY WORK</text>
+  {group_backgrounds}
   <path id="engineering-route-desktop" class="engineering-route desktop-only" d="M92 188 H872" fill="none" stroke="{palette['route']}" stroke-width="2"/>
   <path id="engineering-route-mobile" class="engineering-route mobile-only" d="{mobile_route}" fill="none" stroke="{palette['route']}" stroke-width="2"/>
-  {groups}
+  {nodes}
   {motion}
 </svg>\n'''
 

@@ -18,6 +18,8 @@
 - Animated panels may move only the route signal, node illumination, and heading scan accent.
 - The heading scan travels left-to-right once per 6-second cycle, hides, and resets instantaneously; it never scans back from right to left.
 - Narrow viewports use a dedicated connected route and signal through the centers of the two-row mobile nodes; desktop keeps the straight route.
+- Group-panel backgrounds paint before both routes, and node cards paint after them, keeping the complete static connection visible without drawing through node content.
+- Mobile node-highlight delays derive from cumulative mobile-route length so each glow window centers on the signal's actual node-arrival time.
 - At 380 px and below, required secondary and technology text grows to 27 SVG units and heading baselines separate so 320/360/375 px renderings remain at least 9 px without clipping or overlap.
 - TypeScript and Node.js are explicit primary nodes with slightly stronger stroke, label, and mark weight.
 - Validate the exact required groups and technology labels before rendering or writing any asset.

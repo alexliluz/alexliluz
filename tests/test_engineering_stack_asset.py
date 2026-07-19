@@ -281,6 +281,71 @@ class EngineeringStackAssetTests(unittest.TestCase):
                     self.assertIn("desktop-only", signals[0].attrib["class"].split())
                     self.assertIn("mobile-only", signals[1].attrib["class"].split())
 
+    def test_routes_paint_above_group_panels_and_below_nodes(self) -> None:
+        for name, _, _ in build_engineering_stack.OUTPUTS:
+            with self.subTest(name=name):
+                root = ET.fromstring(
+                    (ROOT / "assets" / name).read_text(encoding="utf-8")
+                )
+                children = list(root)
+                group_indexes = [
+                    index
+                    for index, element in enumerate(children)
+                    if "stack-group" in element.attrib.get("class", "").split()
+                ]
+                route_indexes = [
+                    index
+                    for index, element in enumerate(children)
+                    if "engineering-route" in element.attrib.get("class", "").split()
+                ]
+                node_indexes = [
+                    index
+                    for index, element in enumerate(children)
+                    if "stack-node" in element.attrib.get("class", "").split()
+                ]
+                self.assertEqual(len(group_indexes), 3)
+                self.assertEqual(len(route_indexes), 2)
+                self.assertEqual(len(node_indexes), 7)
+                self.assertLess(max(group_indexes), min(route_indexes))
+                self.assertLess(max(route_indexes), min(node_indexes))
+
+    def test_mobile_node_glow_centers_on_signal_arrival(self) -> None:
+        points = EXPECTED_MOBILE_CENTERS
+        segment_lengths = [
+            ((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2) ** 0.5
+            for start, end in zip(points, points[1:])
+        ]
+        total_length = sum(segment_lengths)
+        cumulative_lengths = [0.0]
+        for length in segment_lengths:
+            cumulative_lengths.append(cumulative_lengths[-1] + length)
+        expected_arrivals = tuple(
+            6 * distance / total_length for distance in cumulative_lengths
+        )
+
+        for theme in ("dark", "light"):
+            with self.subTest(theme=theme):
+                source = build_engineering_stack.build_svg(theme, True)
+                self.assertRegex(
+                    source,
+                    r"(?s)@media \(max-width: 480px\).*?"
+                    r"\.animated-node \{ animation-delay:var\(--mobile-delay\); \}",
+                )
+                mobile_delays = tuple(
+                    float(value)
+                    for value in re.findall(r"--mobile-delay:([-\d.]+)s", source)
+                )
+                self.assertEqual(len(mobile_delays), len(TECHNOLOGIES))
+                for label, arrival, delay in zip(
+                    TECHNOLOGIES, expected_arrivals, mobile_delays
+                ):
+                    self.assertAlmostEqual(
+                        delay + 0.78,
+                        arrival,
+                        delta=0.001,
+                        msg=f"{label} glow must center on its route arrival",
+                    )
+
     def test_heading_scan_moves_left_to_right_once_then_hides(self) -> None:
         for theme in ("dark", "light"):
             with self.subTest(theme=theme):

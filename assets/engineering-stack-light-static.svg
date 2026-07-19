@@ -17,6 +17,7 @@
       @media (max-width: 480px) {
         .desktop-only { display:none; }
         .mobile-only { display:inline; }
+        .animated-node { animation-delay:var(--mobile-delay); }
         .title { font-size:28px; letter-spacing:2px; }
         .subtitle { font-size:21px; letter-spacing:1px; }
         .group-label { font-size:21px; letter-spacing:1px; }
@@ -42,12 +43,19 @@
   <rect x="1" y="1" width="958" height="298" rx="22" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="2"/>
   <text x="30" y="48" class="title">ENGINEERING STACK</text>
   <text x="30" y="75" class="subtitle">PUBLIC TOOLCHAIN · VERIFIED BY WORK</text>
-  <path id="engineering-route-desktop" class="engineering-route desktop-only" d="M92 188 H872" fill="none" stroke="#8C959F" stroke-width="2"/>
-  <path id="engineering-route-mobile" class="engineering-route mobile-only" d="M125 158 L125 239 L356 158 L356 239 L595 158 L835 158 L715 239" fill="none" stroke="#8C959F" stroke-width="2"/>
   <g class="stack-group">
           <rect x="30" y="118" width="238" height="130" rx="18" fill="#FFFFFF" stroke="#D0D7DE"/>
           <text x="48" y="142" class="group-label">BUILD</text>
-          <g class="stack-node primary-node" transform="translate(40 154)" style="--mobile-x:16px;--mobile-y:123px">
+        </g><g class="stack-group">
+          <rect x="282" y="118" width="266" height="130" rx="18" fill="#FFFFFF" stroke="#D0D7DE"/>
+          <text x="300" y="142" class="group-label">AUTOMATE</text>
+        </g><g class="stack-group">
+          <rect x="562" y="118" width="368" height="130" rx="18" fill="#FFFFFF" stroke="#D0D7DE"/>
+          <text x="580" y="142" class="group-label">VERIFY</text>
+        </g>
+  <path id="engineering-route-desktop" class="engineering-route desktop-only" d="M92 188 H872" fill="none" stroke="#8C959F" stroke-width="2"/>
+  <path id="engineering-route-mobile" class="engineering-route mobile-only" d="M125 158 L125 239 L356 158 L356 239 L595 158 L835 158 L715 239" fill="none" stroke="#8C959F" stroke-width="2"/>
+  <g class="stack-node primary-node" transform="translate(40 154)" style="--mobile-x:16px;--mobile-y:123px">
       <rect width="104" height="70" rx="14" fill="#FFFFFF" stroke="#D0D7DE"/>
       <circle cx="20" cy="22" r="10" fill="#3178C6" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#3178C6" font-size="10" font-weight="700">TS</text>
@@ -57,11 +65,7 @@
       <circle cx="20" cy="22" r="10" fill="#3C873A" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#3C873A" font-size="10" font-weight="700">JS</text>
       <text x="52" y="52" text-anchor="middle" class="node-label">Node.js</text>
-    </g>
-        </g><g class="stack-group">
-          <rect x="282" y="118" width="266" height="130" rx="18" fill="#FFFFFF" stroke="#D0D7DE"/>
-          <text x="300" y="142" class="group-label">AUTOMATE</text>
-          <g class="stack-node" transform="translate(298 154)" style="--mobile-x:247px;--mobile-y:123px">
+    </g><g class="stack-node" transform="translate(298 154)" style="--mobile-x:247px;--mobile-y:123px">
       <rect width="104" height="70" rx="14" fill="#FFFFFF" stroke="#D0D7DE"/>
       <circle cx="20" cy="22" r="10" fill="#F69220" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#F69220" font-size="10" font-weight="700">pn</text>
@@ -71,11 +75,7 @@
       <circle cx="20" cy="22" r="10" fill="#2088FF" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#2088FF" font-size="10" font-weight="700">GH</text>
       <text x="52" y="52" text-anchor="middle" class="node-label">GitHub Actions</text>
-    </g>
-        </g><g class="stack-group">
-          <rect x="562" y="118" width="368" height="130" rx="18" fill="#FFFFFF" stroke="#D0D7DE"/>
-          <text x="580" y="142" class="group-label">VERIFY</text>
-          <g class="stack-node" transform="translate(572 154)" style="--mobile-x:486px;--mobile-y:123px">
+    </g><g class="stack-node" transform="translate(572 154)" style="--mobile-x:486px;--mobile-y:123px">
       <rect width="104" height="70" rx="14" fill="#FFFFFF" stroke="#D0D7DE"/>
       <circle cx="20" cy="22" r="10" fill="#729B1B" fill-opacity=".18"/>
       <text x="20" y="26" text-anchor="middle" fill="#729B1B" font-size="10" font-weight="700">Vi</text>
@@ -91,6 +91,5 @@
       <text x="20" y="26" text-anchor="middle" fill="#F05032" font-size="10" font-weight="700">G</text>
       <text x="52" y="52" text-anchor="middle" class="node-label">Git</text>
     </g>
-        </g>
   
 </svg>
