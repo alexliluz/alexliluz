@@ -58,6 +58,30 @@ class SvgNamespaceTests(unittest.TestCase):
         self.assertNotIn("width", root.attrib)
         self.assertNotIn("height", root.attrib)
 
+    def test_rewrites_root_id_references_to_the_guaranteed_root_id(self) -> None:
+        source = f'<svg xmlns="{SVG}" id="scene"><use href="#scene"/></svg>'
+        root = namespace_svg(source, "city")
+        rendered = ET.tostring(root, encoding="unicode")
+        self.assertEqual(root.attrib["id"], "city-root")
+        self.assertIn('href="#city-root"', rendered)
+        self.assertNotIn("city-scene", rendered)
+
+    def test_rewrites_css_id_selectors_without_rewriting_hex_colors(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>#fff{{fill:#fff;filter:url(#fff)}}</style>
+          <g id="fff"/>
+        </svg>'''
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+        self.assertIn("#city-fff{fill:#fff;filter:url(#city-fff)}", rendered)
+
+    def test_rewrites_only_animation_names_that_match_keyframes(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>@keyframes linear{{to{{opacity:1}}}}.tile{{animation:linear 1s linear}}</style>
+        </svg>'''
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+        self.assertIn("@keyframes city-linear", rendered)
+        self.assertIn("animation:city-linear 1s linear", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
