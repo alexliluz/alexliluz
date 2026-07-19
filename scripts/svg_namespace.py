@@ -1,5 +1,6 @@
 import re
 import xml.etree.ElementTree as ET
+from typing import Optional
 
 
 PREFIX = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -66,6 +67,26 @@ def namespace_svg(source: str, prefix: str) -> ET.Element:
 
 
 IDENTIFIER = r"[-_A-Za-z0-9]"
+ANIMATION_KEYWORDS = {
+    "alternate",
+    "alternate-reverse",
+    "backwards",
+    "both",
+    "ease",
+    "ease-in",
+    "ease-in-out",
+    "ease-out",
+    "forwards",
+    "infinite",
+    "linear",
+    "none",
+    "normal",
+    "paused",
+    "reverse",
+    "running",
+    "step-end",
+    "step-start",
+}
 
 
 def _ordered(mapping: dict[str, str]):
@@ -117,7 +138,7 @@ def _rewrite_css_id_references(css: str, id_map: dict[str, str]) -> str:
     rewritten = css
     for old, new in _ordered(id_map):
         rewritten = re.sub(
-            rf"(url\(\s*#){re.escape(old)}(?!{IDENTIFIER})",
+            rf'''(url\(\s*["']?#){re.escape(old)}(?!{IDENTIFIER})''',
             rf"\1{new}",
             rewritten,
         )
@@ -152,20 +173,43 @@ def _rewrite_animation_names(css: str, keyframe_map: dict[str, str]) -> str:
     def rewrite_shorthand(match: re.Match[str]) -> str:
         animations = match.group(2).split(",")
         for index, animation in enumerate(animations):
-            for old, new in _ordered(keyframe_map):
-                rewritten, count = re.subn(
-                    rf"(?<!{IDENTIFIER}){re.escape(old)}(?!{IDENTIFIER})",
-                    new,
-                    animation,
-                    count=1,
+            name_match = _find_animation_name(animation, keyframe_map)
+            if name_match:
+                old = name_match.group(0)
+                animations[index] = (
+                    animation[: name_match.start()]
+                    + keyframe_map[old]
+                    + animation[name_match.end() :]
                 )
-                if count:
-                    animations[index] = rewritten
-                    break
         return match.group(1) + ",".join(animations)
 
     rewritten = name_pattern.sub(rewrite_name_value, css)
     return shorthand_pattern.sub(rewrite_shorthand, rewritten)
+
+
+def _find_animation_name(
+    animation: str, keyframe_map: dict[str, str]
+) -> Optional[re.Match[str]]:
+    fallback = None
+    depth = 0
+    cursor = 0
+    for match in re.finditer(r"[-_A-Za-z][-_A-Za-z0-9]*", animation):
+        for character in animation[cursor : match.start()]:
+            if character == "(":
+                depth += 1
+            elif character == ")":
+                depth -= 1
+        cursor = match.end()
+        name = match.group(0)
+        if depth or name not in keyframe_map:
+            continue
+        if animation[match.end() :].lstrip().startswith("("):
+            continue
+        if fallback is None:
+            fallback = match
+        if name.lower() not in ANIMATION_KEYWORDS:
+            return match
+    return fallback
 
 
 def _assert_reference_integrity(root: ET.Element, old_ids: list[str]) -> None:
@@ -190,7 +234,7 @@ def _assert_reference_integrity(root: ET.Element, old_ids: list[str]) -> None:
 
 
 def _has_css_id_reference(css: str, old: str) -> bool:
-    if re.search(rf"url\(\s*#{re.escape(old)}(?!{IDENTIFIER})", css):
+    if re.search(rf'''url\(\s*["']?#{re.escape(old)}(?!{IDENTIFIER})''', css):
         return True
     return any(
         re.search(rf"(?<=#){re.escape(old)}(?!{IDENTIFIER})", match.group(1))

@@ -82,6 +82,28 @@ class SvgNamespaceTests(unittest.TestCase):
         self.assertIn("@keyframes city-linear", rendered)
         self.assertIn("animation:city-linear 1s linear", rendered)
 
+    def test_rewrites_quoted_css_fragment_urls(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>.tile{{filter:url("#glow");mask:url('#glow')}}</style>
+          <filter id="glow"/>
+        </svg>'''
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+        self.assertIn('url("#city-glow")', rendered)
+        self.assertIn("url('#city-glow')", rendered)
+
+    def test_rewrites_shorthand_name_without_rewriting_keyframe_timing_keyword(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>
+            @keyframes linear{{to{{opacity:1}}}}
+            @keyframes pulse{{to{{opacity:.5}}}}
+            .tile{{animation:pulse 1s linear}}
+          </style>
+        </svg>'''
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+        self.assertIn("@keyframes city-linear", rendered)
+        self.assertIn("@keyframes city-pulse", rendered)
+        self.assertIn("animation:city-pulse 1s linear", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
