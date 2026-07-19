@@ -188,6 +188,26 @@ class ProfileContractTests(unittest.TestCase):
             ],
         )
 
+    def test_contribution_signal_keeps_four_stable_filenames_in_source_order(
+        self,
+    ) -> None:
+        text = self.read_readme()
+        picture = re.search(r"<picture>\n(.*?)\n</picture>", text, re.DOTALL)
+        self.assertIsNotNone(picture)
+        filenames = re.findall(
+            r'<source media="[^"]+" srcset="[^"]+/([^"]+\.svg)">',
+            picture.group(1),
+        )
+        self.assertEqual(
+            filenames,
+            [
+                "contribution-signal-dark-static.svg",
+                "contribution-signal-light-static.svg",
+                "contribution-signal-dark.svg",
+                "contribution-signal-light.svg",
+            ],
+        )
+
     def test_readme_avoids_unapproved_widgets_and_placeholders(self) -> None:
         text = self.read_readme()
         lower_text = text.lower()

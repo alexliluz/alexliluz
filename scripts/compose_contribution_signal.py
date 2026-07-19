@@ -69,6 +69,13 @@ CSS_FILL_DECLARATION_PATTERN = re.compile(
     r"(?:^|;)\s*(?P<declaration>fill\s*:\s*[^;{}]+)",
     re.IGNORECASE,
 )
+LOCAL_FRAGMENT = re.compile(
+    r'''url\(\s*["']?\s*#([A-Za-z_][\w:.-]*)\s*["']?\s*\)''',
+    re.IGNORECASE,
+)
+SMIL_TARGET = re.compile(
+    r"(?<![-_A-Za-z0-9])([-_A-Za-z][-_A-Za-z0-9]*)(?=\.(?:begin|end|click|repeat))"
+)
 
 
 THEMES = {
@@ -296,6 +303,31 @@ def trend_points(history: dict) -> tuple[str, int, str]:
     return geometry.points, geometry.total, geometry.start_date
 
 
+def assert_composed_integrity(source: str) -> None:
+    root = ET.fromstring(source)
+    ids = [element.attrib["id"] for element in root.iter() if "id" in element.attrib]
+    duplicate = next((value for value in ids if ids.count(value) > 1), None)
+    if duplicate:
+        raise ValueError(f"duplicate composed SVG id: {duplicate}")
+    known = set(ids)
+    referenced = set()
+    for element in root.iter():
+        for name, value in element.attrib.items():
+            referenced.update(LOCAL_FRAGMENT.findall(value))
+            if local_name(name) == "href" and value.strip().startswith("#"):
+                referenced.add(value.strip()[1:])
+            if local_name(name) in {"begin", "end"}:
+                referenced.update(SMIL_TARGET.findall(value))
+        if local_name(element.tag) == "style":
+            referenced.update(LOCAL_FRAGMENT.findall(element.text or ""))
+    missing = sorted(referenced - known)
+    if missing:
+        raise ValueError(f"unresolved composed SVG reference: {missing[0]}")
+    for required in ("city-root", "snake-root"):
+        if ids.count(required) != 1:
+            raise ValueError(f"composed SVG requires exactly one {required}")
+
+
 def compose(
     city_source: str,
     snake_source: str,
@@ -331,6 +363,11 @@ def compose(
   <circle id="signal-trend-dot" r="4" fill="{theme['trend']}" filter="url(#signal-trend-glow)">
     <animateMotion path="{geometry.motion_path}" dur="3.2s" repeatCount="indefinite"/>
   </circle>'''
+    else:
+        signal_markup = (
+            f'<circle id="signal-trend-dot" cx="{geometry.final_x:.1f}" '
+            f'cy="{geometry.final_y:.1f}" r="4" fill="{theme["trend"]}"/>'
+        )
     source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 900" role="img" aria-labelledby="title description">
   <title id="title">Alex contribution signal</title>
   <desc id="description">Star trend, 3D contribution city, and original contribution-grid snake.</desc>
@@ -352,6 +389,7 @@ def compose(
 </svg>
 '''
     validate_svg_source(source)
+    assert_composed_integrity(source)
     return source
 
 

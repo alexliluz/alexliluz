@@ -7,6 +7,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import scripts.compose_contribution_signal as contribution_signal
 from scripts.compose_contribution_signal import (
     MAX_BYTES,
     compose,
@@ -171,6 +172,24 @@ class ContributionSignalComposerTests(unittest.TestCase):
             compose_all(city_light, city_dark, snake_light, snake_dark, history, output)
 
             for theme_name in inputs:
+                animated = output / f"contribution-signal-{theme_name}.svg"
+                static = output / f"contribution-signal-{theme_name}-static.svg"
+                self.assertNotEqual(animated.read_bytes(), static.read_bytes())
+                self.assert_static_payload(static.read_text(encoding="utf-8"))
+                static_root = ET.parse(static).getroot()
+                static_signal = next(
+                    element
+                    for element in static_root.iter()
+                    if element.attrib.get("id") == "signal-trend-dot"
+                )
+                self.assertEqual(static_signal.attrib["cx"], "910.0")
+                self.assertEqual(static_signal.attrib["cy"], "55.0")
+                self.assertFalse(
+                    any(
+                        local_name(child.tag) == "animatemotion"
+                        for child in static_signal
+                    )
+                )
                 for suffix in ("", "-static"):
                     path = output / f"contribution-signal-{theme_name}{suffix}.svg"
                     self.assertTrue(path.is_file(), path.name)
@@ -460,6 +479,37 @@ class ContributionSignalComposerTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "script"):
             compose(unsafe, unsafe, history, "light", False)
+
+    def test_composed_integrity_rejects_duplicate_ids(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <g id="city-root"/><g id="snake-root"/><g id="duplicate"/><g id="duplicate"/>
+        </svg>'''
+        with self.assertRaisesRegex(ValueError, "duplicate composed SVG id: duplicate"):
+            contribution_signal.assert_composed_integrity(source)
+
+    def test_composed_integrity_rejects_unresolved_local_references(self) -> None:
+        fixtures = (
+            '<rect fill="URL(\'#missing-css\')"/>',
+            '<use href="#missing-href"/>',
+            '<animate begin="missing-smil.begin"/>',
+        )
+        for fixture in fixtures:
+            with self.subTest(fixture=fixture):
+                source = (
+                    f'<svg xmlns="{SVG}"><g id="city-root"/>'
+                    f'<g id="snake-root"/>{fixture}</svg>'
+                )
+                with self.assertRaisesRegex(
+                    ValueError, "unresolved composed SVG reference"
+                ):
+                    contribution_signal.assert_composed_integrity(source)
+
+    def test_composed_integrity_requires_each_imported_root_once(self) -> None:
+        source = f'<svg xmlns="{SVG}"><g id="city-root"/></svg>'
+        with self.assertRaisesRegex(
+            ValueError, "composed SVG requires exactly one snake-root"
+        ):
+            contribution_signal.assert_composed_integrity(source)
 
     def test_rejects_inputs_at_and_outputs_above_the_size_limit(self) -> None:
         with tempfile.TemporaryDirectory() as directory_name:
