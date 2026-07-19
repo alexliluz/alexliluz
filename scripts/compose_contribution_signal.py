@@ -35,6 +35,7 @@ SMIL_LOCAL_NAMES = {
     "animatecolor",
     "animatemotion",
     "animatetransform",
+    "discard",
     "set",
 }
 ACTIVE_CITY_CLASS = re.compile(
@@ -76,6 +77,7 @@ LOCAL_FRAGMENT = re.compile(
 SMIL_TARGET = re.compile(
     r"(?<![-_A-Za-z0-9])([-_A-Za-z][-_A-Za-z0-9]*)(?=\.(?:begin|end|click|repeat))"
 )
+SNAKE_ACCENT_GLOW_ID = "snake-accent-glow"
 
 
 THEMES = {
@@ -177,6 +179,22 @@ def static_source(source: str) -> str:
     return static
 
 
+def assert_static_integrity(source: str) -> None:
+    root = ET.fromstring(source)
+    for element in root.iter():
+        name = local_name(element.tag)
+        if name in SMIL_LOCAL_NAMES:
+            raise ValueError(f"static SVG contains executable SMIL element: {name}")
+        if name == "style" and strip_css_motion_declarations(element.text or "") != (
+            element.text or ""
+        ):
+            raise ValueError("static SVG contains CSS motion declaration")
+        if "style" in element.attrib and strip_css_motion_declarations(
+            element.attrib["style"]
+        ) != element.attrib["style"]:
+            raise ValueError("static SVG contains CSS motion declaration")
+
+
 def _append_smil(element: ET.Element, **attributes: str) -> None:
     ET.SubElement(element, f"{{{SVG_NAMESPACE}}}animate", attributes)
 
@@ -192,6 +210,53 @@ def tune_snake_motion(root: ET.Element) -> None:
         replacements += count
     if replacements == 0:
         raise ValueError("upstream snake CSS no longer contains 18500ms")
+    _add_snake_accent_glow(root)
+
+
+def _add_snake_accent_glow(root: ET.Element) -> None:
+    accents = [
+        element
+        for element in root.iter()
+        if _is_platane_snake_accent(element)
+    ]
+    if not accents:
+        return
+    if any(element.attrib.get("id") == SNAKE_ACCENT_GLOW_ID for element in root.iter()):
+        raise ValueError(f"upstream snake reserves generated id: {SNAKE_ACCENT_GLOW_ID}")
+    if any("filter" in element.attrib for element in accents):
+        raise ValueError("upstream snake moving accent already defines a filter")
+
+    defs = next(
+        (element for element in root if local_name(element.tag) == "defs"), None
+    )
+    if defs is None:
+        defs = ET.Element(f"{{{SVG_NAMESPACE}}}defs")
+        root.insert(0, defs)
+    glow = ET.SubElement(
+        defs,
+        f"{{{SVG_NAMESPACE}}}filter",
+        {
+            "id": SNAKE_ACCENT_GLOW_ID,
+            "x": "-35%",
+            "y": "-35%",
+            "width": "170%",
+            "height": "170%",
+        },
+    )
+    ET.SubElement(
+        glow,
+        f"{{{SVG_NAMESPACE}}}feGaussianBlur",
+        {"stdDeviation": "0.65"},
+    )
+    for accent in accents:
+        accent.attrib["filter"] = f"url(#{SNAKE_ACCENT_GLOW_ID})"
+
+
+def _is_platane_snake_accent(element: ET.Element) -> bool:
+    classes = element.attrib.get("class", "").split()
+    return "snake-s" in classes and any(
+        re.fullmatch(r"snake-s[0-9]+", token) for token in classes
+    )
 
 
 def tune_city_motion(root: ET.Element, theme_name: str) -> None:
@@ -339,13 +404,31 @@ def compose(
     validate_svg_source(city_source)
     validate_svg_source(snake_source)
     if static:
-        city_source = static_source(city_source)
-        snake_source = static_source(snake_source)
-    city_root = namespace_svg(city_source, "city")
-    snake_root = namespace_svg(snake_source, "snake")
+        try:
+            city_source = static_source(city_source)
+        except ValueError as error:
+            raise ValueError(f"city transform: {error}") from error
+        try:
+            snake_source = static_source(snake_source)
+        except ValueError as error:
+            raise ValueError(f"snake transform: {error}") from error
+    try:
+        city_root = namespace_svg(city_source, "city")
+    except ValueError as error:
+        raise ValueError(f"city import: {error}") from error
+    try:
+        snake_root = namespace_svg(snake_source, "snake")
+    except ValueError as error:
+        raise ValueError(f"snake import: {error}") from error
     if not static:
-        tune_city_motion(city_root, theme_name)
-        tune_snake_motion(snake_root)
+        try:
+            tune_city_motion(city_root, theme_name)
+        except ValueError as error:
+            raise ValueError(f"city transform: {error}") from error
+        try:
+            tune_snake_motion(snake_root)
+        except ValueError as error:
+            raise ValueError(f"snake transform: {error}") from error
     city_markup = position_imported_svg(city_root, x=88, y=110, width=784, height=520)
     snake_markup = position_imported_svg(snake_root, x=42, y=695, width=876, height=191)
     geometry = trend_geometry(history)
@@ -390,6 +473,8 @@ def compose(
 '''
     validate_svg_source(source)
     assert_composed_integrity(source)
+    if static:
+        assert_static_integrity(source)
     return source
 
 
@@ -403,18 +488,24 @@ def compose_all(
 ) -> None:
     history = load_history(history_path)
     sources = {
-        "light": (read_safe_svg(city_light), read_safe_svg(snake_light)),
-        "dark": (read_safe_svg(city_dark), read_safe_svg(snake_dark)),
+        "light": (read_safe_svg(city_light), read_safe_svg(snake_light), city_light, snake_light),
+        "dark": (read_safe_svg(city_dark), read_safe_svg(snake_dark), city_dark, snake_dark),
     }
     output_directory.mkdir(parents=True, exist_ok=True)
-    for theme_name, (city_source, snake_source) in sources.items():
+    for theme_name, (city_source, snake_source, city_path, snake_path) in sources.items():
         for static in (False, True):
             suffix = "-static" if static else ""
             path = output_directory / f"contribution-signal-{theme_name}{suffix}.svg"
-            path.write_text(
-                compose(city_source, snake_source, history, theme_name, static),
-                encoding="utf-8",
-            )
+            try:
+                composed = compose(city_source, snake_source, history, theme_name, static)
+            except ValueError as error:
+                message = str(error)
+                if message.startswith("city "):
+                    raise ValueError(f"city source ({city_path}): {message}") from error
+                if message.startswith("snake "):
+                    raise ValueError(f"snake source ({snake_path}): {message}") from error
+                raise
+            path.write_text(composed, encoding="utf-8")
 
 
 def main() -> int:

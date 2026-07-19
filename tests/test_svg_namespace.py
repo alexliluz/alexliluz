@@ -74,6 +74,32 @@ class SvgNamespaceTests(unittest.TestCase):
         rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
         self.assertIn("#city-fff{fill:#fff;filter:url(#city-fff)}", rendered)
 
+    def test_preserves_paint_colors_and_rewrites_inline_css_and_idref_lists(self) -> None:
+        source = f'''<svg xmlns="{SVG}" aria-labelledby="title fff" aria-describedby="fff">
+          <style>
+            @keyframes pulse{{to{{opacity:1}}}}
+            .tile\\:active,.tile\\3A active{{animation:pulse 1s;fill:#fff;stroke:var(--tone)}}
+          </style>
+          <title id="title">Tile</title><g id="fff"/>
+          <rect class="tile:active" fill="#fff" stroke="#fff"
+            style="animation:pulse 1s;fill:#fff;stroke:var(--tone);--tone:#fff;--inline-tone:#fff;opacity:var(--inline-tone)"/>
+        </svg>'''
+
+        rendered = ET.tostring(namespace_svg(source, "city"), encoding="unicode")
+
+        self.assertIn('aria-labelledby="city-title city-fff"', rendered)
+        self.assertIn('aria-describedby="city-fff"', rendered)
+        self.assertIn('class="city-tile:active"', rendered)
+        self.assertIn(".city-tile\\:active", rendered)
+        self.assertEqual(rendered.count(".city-tile\\:active"), 2)
+        self.assertIn('fill="#fff"', rendered)
+        self.assertIn('stroke="#fff"', rendered)
+        self.assertIn("animation:city-pulse 1s", rendered)
+        self.assertIn("var(--city-tone)", rendered)
+        self.assertIn("--city-tone:#fff", rendered)
+        self.assertIn("var(--city-inline-tone)", rendered)
+        self.assertIn("--city-inline-tone:#fff", rendered)
+
     def test_rewrites_only_animation_names_that_match_keyframes(self) -> None:
         source = f'''<svg xmlns="{SVG}">
           <style>@keyframes linear{{to{{opacity:1}}}}.tile{{animation:linear 1s linear}}</style>

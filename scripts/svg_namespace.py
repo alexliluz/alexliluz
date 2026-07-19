@@ -6,6 +6,17 @@ from typing import Optional
 PREFIX = re.compile(r"^[a-z][a-z0-9-]*$")
 KEYFRAME = re.compile(r"(@(?:-[a-z]+-)?keyframes\s+)([-_A-Za-z][-_A-Za-z0-9]*)", re.I)
 CUSTOM_PROPERTY = re.compile(r"--([-_A-Za-z][-_A-Za-z0-9]*)")
+URL_FRAGMENT = re.compile(r'''(url\(\s*["']?#)([^\s"')]+)(?=\s*["']?\s*\))''', re.I)
+IDREF_LIST_ATTRIBUTES = {
+    "aria-activedescendant",
+    "aria-controls",
+    "aria-describedby",
+    "aria-details",
+    "aria-errormessage",
+    "aria-flowto",
+    "aria-labelledby",
+    "aria-owns",
+}
 
 
 def local_name(name: str) -> str:
@@ -29,6 +40,9 @@ def namespace_svg(source: str, prefix: str) -> ET.Element:
         for token in element.attrib.get("class", "").split()
     }
     styles = [element for element in root.iter() if local_name(element.tag) == "style"]
+    inline_styles = [
+        element.attrib["style"] for element in root.iter() if "style" in element.attrib
+    ]
     keyframes = {
         match.group(2)
         for style in styles
@@ -36,8 +50,8 @@ def namespace_svg(source: str, prefix: str) -> ET.Element:
     }
     custom_properties = {
         match.group(1)
-        for style in styles
-        for match in CUSTOM_PROPERTY.finditer(style.text or "")
+        for css in [*(style.text or "" for style in styles), *inline_styles]
+        for match in CUSTOM_PROPERTY.finditer(css)
     }
 
     id_map = {value: f"{prefix}-{value}" for value in ids}
@@ -55,7 +69,12 @@ def namespace_svg(source: str, prefix: str) -> ET.Element:
                 class_map[token] for token in element.attrib["class"].split()
             )
         for name, value in list(element.attrib.items()):
-            element.attrib[name] = _rewrite_value(value, id_map)
+            if local_name(name) == "style":
+                element.attrib[name] = _rewrite_css(
+                    value, prefix, id_map, class_map, keyframe_map, property_map
+                )
+            else:
+                element.attrib[name] = _rewrite_value(name, value, id_map)
         if local_name(element.tag) == "style":
             element.text = _rewrite_css(
                 element.text or "", prefix, id_map, class_map, keyframe_map, property_map
@@ -95,14 +114,20 @@ def _ordered(mapping: dict[str, str]):
     return sorted(mapping.items(), key=lambda item: len(item[0]), reverse=True)
 
 
-def _rewrite_value(value: str, id_map: dict[str, str]) -> str:
-    rewritten = value
+def _rewrite_value(name: str, value: str, id_map: dict[str, str]) -> str:
+    attribute_name = local_name(name)
+    if attribute_name in IDREF_LIST_ATTRIBUTES:
+        return " ".join(id_map.get(token, token) for token in value.split())
+    if attribute_name == "href" and value.strip().startswith("#"):
+        fragment = value.strip()[1:]
+        return "#" + id_map.get(fragment, fragment)
+
+    rewritten = URL_FRAGMENT.sub(
+        lambda match: match.group(1) + id_map.get(match.group(2), match.group(2)), value
+    )
+    if attribute_name not in {"begin", "end"}:
+        return rewritten
     for old, new in _ordered(id_map):
-        rewritten = re.sub(
-            rf"(?<=#){re.escape(old)}(?!{IDENTIFIER})",
-            new,
-            rewritten,
-        )
         rewritten = re.sub(
             rf"(?<!{IDENTIFIER}){re.escape(old)}(?=\.(?:begin|end|click|repeat))",
             new,
@@ -122,7 +147,9 @@ def _rewrite_css(
     rewritten = re.sub(r"(?<![-_A-Za-z0-9]):root(?![-_A-Za-z0-9])", f"#{prefix}-root", css)
     for old, new in _ordered(class_map):
         rewritten = re.sub(
-            rf"(?<=\.){re.escape(old)}(?!{IDENTIFIER})", new, rewritten
+            rf"(?<=\.){_css_identifier_pattern(old)}(?!{IDENTIFIER}|\\)",
+            _escape_css_identifier(new),
+            rewritten,
         )
     rewritten = _rewrite_css_id_references(rewritten, id_map)
     rewritten = KEYFRAME.sub(
@@ -134,6 +161,25 @@ def _rewrite_css(
             rf"--{re.escape(old)}(?!{IDENTIFIER})", f"--{new}", rewritten
         )
     return rewritten
+
+
+def _css_identifier_pattern(identifier: str) -> str:
+    """Match a CSS identifier in literal or escaped form without parsing CSS."""
+    parts = []
+    for character in identifier:
+        codepoint = f"{ord(character):x}"
+        hex_pattern = "".join(
+            f"[{digit.lower()}{digit.upper()}]" if digit.isalpha() else digit
+            for digit in codepoint
+        )
+        parts.append(
+            rf"(?:{re.escape(character)}|\\{re.escape(character)}|\\0*{hex_pattern}(?:(?:\r\n|[ \t\r\n\f])|(?![0-9a-f])))"
+        )
+    return "".join(parts)
+
+
+def _escape_css_identifier(identifier: str) -> str:
+    return re.sub(r"[^-_A-Za-z0-9]", lambda match: "\\" + match.group(0), identifier)
 
 
 def _rewrite_css_id_references(css: str, id_map: dict[str, str]) -> str:
@@ -237,18 +283,32 @@ def _assert_reference_integrity(root: ET.Element, old_ids: list[str]) -> None:
             rf"#{re.escape(old)}(?!{IDENTIFIER})",
             rf"(?<!{IDENTIFIER}){re.escape(old)}(?=\.(?:begin|end|click|repeat))",
         )
-        attribute_values = tuple(
-            value for element in root.iter() for value in element.attrib.values()
-        )
         has_attribute_reference = any(
-            re.search(pattern, value) for pattern in fragments for value in attribute_values
+            (
+                local_name(name) == "href" and value.strip() == f"#{old}"
+            )
+            or any(
+                match.group(2) == old for match in URL_FRAGMENT.finditer(value)
+            )
+            or (
+                local_name(name) in {"begin", "end"}
+                and re.search(fragments[1], value)
+            )
+            for element in root.iter()
+            for name, value in element.attrib.items()
+        )
+        has_idref_reference = any(
+            old in value.split()
+            for element in root.iter()
+            for name, value in element.attrib.items()
+            if local_name(name) in IDREF_LIST_ATTRIBUTES
         )
         has_css_reference = any(
             _has_css_id_reference(element.text or "", old)
             for element in root.iter()
             if local_name(element.tag) == "style"
         )
-        if has_attribute_reference or has_css_reference:
+        if has_attribute_reference or has_idref_reference or has_css_reference:
             raise ValueError(f"unresolved local SVG reference: {old}")
 
 

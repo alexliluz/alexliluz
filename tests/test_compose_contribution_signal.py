@@ -10,6 +10,7 @@ from pathlib import Path
 import scripts.compose_contribution_signal as contribution_signal
 from scripts.compose_contribution_signal import (
     MAX_BYTES,
+    assert_static_integrity,
     compose,
     compose_all,
     static_source,
@@ -21,7 +22,14 @@ from scripts.svg_namespace import namespace_svg
 
 
 SVG = "http://www.w3.org/2000/svg"
-SMIL_NAMES = {"animate", "animatecolor", "animatemotion", "animatetransform", "set"}
+SMIL_NAMES = {
+    "animate",
+    "animatecolor",
+    "animatemotion",
+    "animatetransform",
+    "discard",
+    "set",
+}
 CSS_MOTION = re.compile(
     r"(?:-[a-z]+-)?(?:animation|transition)(?:-[a-z-]+)?\s*:",
     re.IGNORECASE,
@@ -148,6 +156,42 @@ class ContributionSignalComposerTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "18500ms"):
             tune_snake_motion(root)
+
+    def test_snake_glow_targets_only_platane_moving_accents(self) -> None:
+        source = f'''<svg xmlns="{SVG}">
+          <style>.s{{animation:s0 18500ms linear infinite}}.c{{fill:#39d353}}</style>
+          <rect class="c" x="2" y="2"/>
+          <rect class="s s0" x="18" y="2"/>
+          <rect class="s s1" x="34" y="2"/>
+        </svg>'''
+        root = namespace_svg(source, "snake")
+
+        tune_snake_motion(root)
+
+        glow = next(
+            element
+            for element in root.iter()
+            if element.attrib.get("id") == "snake-accent-glow"
+        )
+        self.assertEqual(local_name(glow.tag), "filter")
+        accents = [
+            element
+            for element in root.iter()
+            if "snake-s" in element.attrib.get("class", "").split()
+        ]
+        cells = [
+            element
+            for element in root.iter()
+            if "snake-c" in element.attrib.get("class", "").split()
+        ]
+        self.assertEqual(len(accents), 2)
+        self.assertTrue(
+            all(
+                element.attrib.get("filter") == "url(#snake-accent-glow)"
+                for element in accents
+            )
+        )
+        self.assertTrue(all("filter" not in element.attrib for element in cells))
 
     def test_composes_byte_preserving_animated_and_valid_static_theme_variants(self) -> None:
         with tempfile.TemporaryDirectory() as directory_name:
@@ -335,6 +379,18 @@ class ContributionSignalComposerTests(unittest.TestCase):
         self.assert_static_payload(static)
         ET.fromstring(static)
 
+    def test_staticization_removes_discard_and_static_integrity_rejects_executable_smil(self) -> None:
+        source = f'<svg xmlns="{SVG}"><rect><discard begin="1s"/></rect></svg>'
+
+        static = static_source(source)
+
+        self.assert_static_payload(static)
+        for name in SMIL_NAMES:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
+                assert_static_integrity(
+                    f'<svg xmlns="{SVG}"><rect><{name}/></rect></svg>'
+                )
+
     def test_staticization_preserves_first_keyframe_fill_as_fallback(self) -> None:
         source = (
             f'<svg xmlns="{SVG}">'
@@ -469,6 +525,33 @@ class ContributionSignalComposerTests(unittest.TestCase):
                 path.write_text(source, encoding="utf-8")
                 with self.subTest(source=source), self.assertRaises(ValueError):
                     compose_all(path, path, path, path, directory / "missing.json", directory)
+
+    def test_compose_all_reports_the_failing_import_role_and_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory_name:
+            directory = Path(directory_name)
+            city_light = directory / "city-light.svg"
+            city_light.write_text(
+                f'<svg xmlns="{SVG}"><g id="root"/></svg>', encoding="utf-8"
+            )
+            city_dark = directory / "city-dark.svg"
+            snake_light = directory / "snake-light.svg"
+            snake_dark = directory / "snake-dark.svg"
+            for path in (city_dark, snake_light, snake_dark):
+                self.write_svg(path, path.stem)
+            history = directory / "star-history.json"
+            self.write_history(history)
+
+            with self.assertRaisesRegex(
+                ValueError, rf"city source \({re.escape(str(city_light))}\)"
+            ):
+                compose_all(
+                    city_light,
+                    city_dark,
+                    snake_light,
+                    snake_dark,
+                    history,
+                    directory / "output",
+                )
 
     def test_compose_rejects_unsafe_source_strings_before_embedding(self) -> None:
         unsafe = f'<svg xmlns="{SVG}" xmlns:s="{SVG}"><s:script>x()</s:script></svg>'
