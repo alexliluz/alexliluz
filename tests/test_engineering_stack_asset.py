@@ -1,3 +1,4 @@
+import re
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -61,6 +62,49 @@ class EngineeringStackAssetTests(unittest.TestCase):
                     self.assertEqual(source.count(f">{label}<"), 1)
                 self.assertNotIn(">Python<", source)
                 self.assertLess(path.stat().st_size, 2 * 1024 * 1024)
+
+    def test_all_variants_define_legible_two_row_narrow_viewport_layout(self) -> None:
+        scale_at_420_px = 420 / 960
+        minimum_rendered_sizes = {
+            ".title": 12,
+            ".subtitle": 9,
+            ".group-label": 9,
+            ".node-label": 9,
+        }
+
+        for name, theme, animated in build_engineering_stack.OUTPUTS:
+            with self.subTest(name=name):
+                source = (ROOT / "assets" / name).read_text(encoding="utf-8")
+                self.assertEqual(
+                    source,
+                    build_engineering_stack.build_svg(theme, animated),
+                    "committed asset must match the responsive generator output",
+                )
+                media_start = source.find("@media (max-width: 480px)")
+                self.assertNotEqual(
+                    media_start,
+                    -1,
+                    "narrow SVG viewports need a dedicated responsive layout",
+                )
+                mobile_css = source[media_start : source.index("</style>")]
+
+                for selector, minimum in minimum_rendered_sizes.items():
+                    match = re.search(
+                        rf"{re.escape(selector)}\s*\{{[^}}]*font-size:(\d+)px",
+                        mobile_css,
+                    )
+                    self.assertIsNotNone(match, f"missing mobile size for {selector}")
+                    self.assertGreaterEqual(
+                        int(match.group(1)) * scale_at_420_px,
+                        minimum,
+                        f"{selector} renders below {minimum}px at 420px",
+                    )
+
+                positions = re.findall(
+                    r"--mobile-x:(\d+)px;--mobile-y:(\d+)px", source
+                )
+                self.assertEqual(len(positions), len(TECHNOLOGIES))
+                self.assertEqual({int(y) for _, y in positions}, {123, 204})
 
     def test_motion_exists_only_in_animated_variants(self) -> None:
         for theme in ("dark", "light"):

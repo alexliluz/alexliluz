@@ -58,9 +58,26 @@ OUTPUTS = (
     ("engineering-stack-light-static.svg", "light", False),
 )
 
+MOBILE_NODE_POSITIONS = {
+    "TypeScript": (16, 123),
+    "Node.js": (16, 204),
+    "pnpm": (247, 123),
+    "GitHub Actions": (247, 204),
+    "Vitest": (486, 123),
+    "Playwright": (726, 123),
+    "Git": (606, 204),
+}
+
 
 def render_node(node: StackNode, palette: dict[str, str], animated: bool) -> str:
-    style = f' style="--delay:{node.delay:.2f}s"' if animated else ""
+    mobile_x, mobile_y = MOBILE_NODE_POSITIONS[node.label]
+    style_declarations = [
+        f"--mobile-x:{mobile_x}px",
+        f"--mobile-y:{mobile_y}px",
+    ]
+    if animated:
+        style_declarations.append(f"--delay:{node.delay:.2f}s")
+    style = f' style="{";".join(style_declarations)}"'
     class_name = "stack-node animated-node" if animated else "stack-node"
     return f'''<g class="{class_name}" transform="translate({node.x - 52} 154)"{style}>
       <rect width="104" height="70" rx="14" fill="{palette['panel']}" stroke="{palette['border']}"/>
@@ -105,6 +122,22 @@ def build_svg(theme: str, animated: bool) -> str:
       .subtitle,.group-label {{ fill:{palette['muted']}; font-size:12px; font-weight:600; letter-spacing:2px; }}
       .node-label {{ fill:{palette['text']}; font-size:12px; font-weight:600; }}
       {motion_css}
+      @media (max-width: 480px) {{
+        .title {{ font-size:28px; letter-spacing:2px; }}
+        .subtitle {{ font-size:21px; letter-spacing:1px; }}
+        .group-label {{ font-size:21px; letter-spacing:1px; }}
+        .node-label {{ font-size:21px; }}
+        .stack-group:nth-of-type(1) > rect {{ x:8px; y:96px; width:228px; height:188px; }}
+        .stack-group:nth-of-type(2) > rect {{ x:239px; y:96px; width:228px; height:188px; }}
+        .stack-group:nth-of-type(3) > rect {{ x:478px; y:96px; width:474px; height:188px; }}
+        .stack-group:nth-of-type(1) > .group-label {{ x:22px; y:112px; }}
+        .stack-group:nth-of-type(2) > .group-label {{ x:253px; y:112px; }}
+        .stack-group:nth-of-type(3) > .group-label {{ x:492px; y:112px; }}
+        .stack-node {{ transform:translate(var(--mobile-x), var(--mobile-y)); }}
+        .stack-node > rect {{ width:218px; height:70px; }}
+        .stack-node > text:first-of-type {{ font-size:16px; }}
+        .stack-node > .node-label {{ x:122px; }}
+      }}
     </style>
   </defs>
   <rect x="1" y="1" width="958" height="298" rx="22" fill="{palette['surface']}" stroke="{palette['border']}" stroke-width="2"/>
