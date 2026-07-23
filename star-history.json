@@ -32,6 +32,14 @@
         "ForkNeo": 1,
         "api-image-neo": 0
       }
+    },
+    {
+      "date": "2026-07-23",
+      "repos": {
+        "planarian": 1,
+        "ForkNeo": 1,
+        "api-image-neo": 0
+      }
     }
   ]
 }
