@@ -944,6 +944,14 @@
         "ForkNeo": 1,
         "api-image-neo": 0
       }
+    },
+    {
+      "date": "2026-11-17",
+      "repos": {
+        "planarian": 1,
+        "ForkNeo": 1,
+        "api-image-neo": 0
+      }
     }
   ]
 }
